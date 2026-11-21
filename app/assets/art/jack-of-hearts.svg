@@ -1,0 +1,173 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 700" width="500" height="700">
+  <!-- Jack of Hearts, an original court card for the game: a cameo profile in a gold
+       medallion, one red eye, art-deco sunburst, mirrored halves, J and heart indices. -->
+  <defs>
+    <path id="heart" d="M50 92 C 20 66, 0 47, 0 27 C 0 11, 12 0, 27 0 C 38 0, 46 7, 50 17 C 54 7, 62 0, 73 0 C 88 0, 100 11, 100 27 C 100 47, 80 66, 50 92 Z"/>
+
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FBE7A1"/>
+      <stop offset="0.35" stop-color="#E3B23C"/>
+      <stop offset="0.7" stop-color="#9C6E17"/>
+      <stop offset="1" stop-color="#F3D27A"/>
+    </linearGradient>
+    <linearGradient id="goldV" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FBE7A1"/>
+      <stop offset="0.5" stop-color="#D9A637"/>
+      <stop offset="1" stop-color="#8E6214"/>
+    </linearGradient>
+    <radialGradient id="field" cx="0.5" cy="0.45" r="0.7">
+      <stop offset="0" stop-color="#3A0B16"/>
+      <stop offset="0.5" stop-color="#14070B"/>
+      <stop offset="1" stop-color="#070405"/>
+    </radialGradient>
+    <radialGradient id="velvet" cx="0.38" cy="0.4" r="0.75">
+      <stop offset="0" stop-color="#4A0D1B"/>
+      <stop offset="0.7" stop-color="#1C0609"/>
+      <stop offset="1" stop-color="#0B0304"/>
+    </radialGradient>
+    <radialGradient id="aura" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FF2E4D" stop-opacity="0.6"/>
+      <stop offset="0.5" stop-color="#C41E3A" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#C41E3A" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="face" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#3B111C"/>
+      <stop offset="0.45" stop-color="#1C090E"/>
+      <stop offset="1" stop-color="#0B0405"/>
+    </linearGradient>
+    <linearGradient id="capVelvet" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#E0263F"/>
+      <stop offset="0.6" stop-color="#8E1428"/>
+      <stop offset="1" stop-color="#4A0812"/>
+    </linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2.2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="topHalf"><rect x="92" y="44" width="316" height="306"/></clipPath>
+    <clipPath id="cameo"><ellipse cx="258" cy="188" rx="100" ry="124"/></clipPath>
+    <pattern id="lattice" width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <path d="M0 0 L0 14" stroke="#E3B23C" stroke-width="0.8" stroke-opacity="0.12"/>
+    </pattern>
+
+    <g id="half">
+      <rect x="92" y="44" width="316" height="306" fill="url(#field)"/>
+
+      <!-- sunburst and red aura behind the medallion -->
+      <circle cx="258" cy="188" r="170" fill="url(#aura)"/>
+      <g stroke="url(#gold)" stroke-width="1.4" opacity="0.45">
+        <path d="M258 188 L92 64"/>  <path d="M258 188 L92 110"/> <path d="M258 188 L92 158"/>
+        <path d="M258 188 L92 206"/> <path d="M258 188 L92 254"/> <path d="M258 188 L92 302"/>
+        <path d="M258 188 L134 44"/> <path d="M258 188 L182 44"/> <path d="M258 188 L230 44"/>
+        <path d="M258 188 L278 44"/> <path d="M258 188 L326 44"/> <path d="M258 188 L374 44"/>
+        <path d="M258 188 L408 82"/> <path d="M258 188 L408 130"/> <path d="M258 188 L408 178"/>
+        <path d="M258 188 L408 226"/><path d="M258 188 L408 274"/> <path d="M258 188 L408 322"/>
+      </g>
+
+      <!-- heart pip -->
+      <use href="#heart" transform="translate(108 60) scale(0.38)" fill="#E0263F" filter="url(#soft)"/>
+
+      <!-- the medallion -->
+      <ellipse cx="258" cy="188" rx="100" ry="124" fill="url(#velvet)"/>
+      <g clip-path="url(#cameo)">
+        <!-- cloak and shoulders -->
+        <path d="M150 352 L150 318 C 186 292, 226 284, 262 284 C 300 284, 340 294, 370 318 L370 352 Z" fill="#0E0809" stroke="url(#gold)" stroke-width="2.5"/>
+        <path d="M168 330 C 200 310, 230 304, 262 304 C 294 304, 326 312, 352 330" fill="none" stroke="url(#gold)" stroke-width="1.6" stroke-dasharray="1 6" stroke-linecap="round"/>
+
+        <!-- neck -->
+        <path d="M246 248 L240 300 L296 300 L290 226 Z" fill="url(#face)"/>
+        <path d="M246 252 L242 298" fill="none" stroke="url(#gold)" stroke-width="2" opacity="0.8"/>
+
+        <!-- high collar with a ruby -->
+        <path d="M228 318 L238 268 L262 300 Z" fill="#120A0C" stroke="url(#gold)" stroke-width="2.4" stroke-linejoin="round"/>
+        <path d="M310 318 L302 262 L276 300 Z" fill="#120A0C" stroke="url(#gold)" stroke-width="2.4" stroke-linejoin="round"/>
+        <circle cx="268" cy="304" r="7" fill="#E0263F" stroke="url(#gold)" stroke-width="2.4" filter="url(#soft)"/>
+
+        <!-- hair, swept back -->
+        <path d="M288 120 C 318 130, 334 168, 328 206 C 324 234, 310 256, 292 266 C 298 244, 300 216, 294 192 C 290 170, 282 148, 266 132 Z" fill="#100708"/>
+        <g fill="none" stroke="url(#gold)" stroke-linecap="round" opacity="0.95">
+          <path d="M290 134 C 310 160, 316 196, 304 236" stroke-width="2.2"/>
+          <path d="M302 132 C 324 162, 326 204, 314 242" stroke-width="1.6"/>
+          <path d="M282 146 C 296 170, 300 204, 292 236" stroke-width="1.3" opacity="0.7"/>
+        </g>
+
+        <!-- the face, a cameo profile -->
+        <path d="M232 128
+                 C 226 140, 223 152, 222 160
+                 Q 224 164, 223 168
+                 L 206 196
+                 C 204 199, 207 203, 212 203
+                 L 218 204
+                 C 217 207, 213 209, 213 212
+                 C 215 215, 219 216, 221 216
+                 C 217 218, 214 221, 215 224
+                 C 217 227, 221 229, 221 231
+                 C 219 236, 218 242, 222 247
+                 C 230 254, 246 256, 260 250
+                 C 272 244, 282 232, 286 220
+                 L 300 150
+                 L 296 124
+                 C 280 118, 250 118, 232 128 Z"
+              fill="url(#face)"/>
+        <!-- rim light along the profile -->
+        <path d="M232 128 C 226 140, 223 152, 222 160 Q 224 164, 223 168 L 206 196 C 204 199, 207 203, 212 203 L 218 204 C 217 207, 213 209, 213 212 C 215 215, 219 216, 221 216 C 217 218, 214 221, 215 224 C 217 227, 221 229, 221 231 C 219 236, 218 242, 222 247 C 230 254, 246 256, 260 250"
+              fill="none" stroke="url(#goldV)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" filter="url(#soft)"/>
+        <!-- cheekbone and jaw, a hint of gold -->
+        <path d="M236 204 C 248 210, 262 210, 274 202" fill="none" stroke="url(#gold)" stroke-width="1.4" opacity="0.55"/>
+        <!-- brow -->
+        <path d="M224 160 C 230 156, 238 156, 244 159" fill="none" stroke="url(#gold)" stroke-width="2" stroke-linecap="round" opacity="0.9"/>
+        <!-- the eye -->
+        <path d="M224 170 C 229 165, 237 164, 243 167 C 238 172, 230 174, 224 170 Z" fill="#FF3352" filter="url(#glow)"/>
+        <circle cx="233" cy="169" r="1.6" fill="#FFF0F2"/>
+        <!-- the smile -->
+        <path d="M214 213 C 217 215, 222 215, 225 213" fill="none" stroke="#E0263F" stroke-width="2" stroke-linecap="round"/>
+
+        <!-- velvet cap with a gold band and a ruby -->
+        <path d="M222 132 C 222 104, 246 84, 280 80 C 312 76, 340 88, 342 108 C 344 124, 326 132, 300 132 Z" fill="url(#capVelvet)" stroke="url(#gold)" stroke-width="2.4" stroke-linejoin="round"/>
+        <path d="M238 108 C 252 94, 274 88, 296 88" fill="none" stroke="#FF8597" stroke-width="2.4" stroke-linecap="round" opacity="0.55"/>
+        <path d="M218 128 C 248 122, 278 122, 308 128 L 306 140 C 278 134, 248 134, 220 140 Z" fill="url(#goldV)" stroke="#2A1608" stroke-width="1"/>
+        <circle cx="240" cy="132" r="5.5" fill="#E0263F" stroke="#FBE7A1" stroke-width="1.6" filter="url(#soft)"/>
+      </g>
+      <!-- medallion rings -->
+      <ellipse cx="258" cy="188" rx="100" ry="124" fill="none" stroke="url(#gold)" stroke-width="5"/>
+      <ellipse cx="258" cy="188" rx="108" ry="132" fill="none" stroke="url(#gold)" stroke-width="3" stroke-dasharray="0.1 9" stroke-linecap="round"/>
+      <ellipse cx="258" cy="188" rx="93" ry="117" fill="none" stroke="#FBE7A1" stroke-width="0.8" opacity="0.6"/>
+      <!-- the plume, sweeping out of the medallion -->
+      <path d="M314 104 C 330 78, 356 58, 396 48 C 384 60, 370 70, 358 82 C 346 94, 334 104, 322 114 Z" fill="url(#gold)" stroke="#2A1608" stroke-width="1" stroke-linejoin="round"/>
+      <path d="M318 108 C 336 84, 360 64, 392 51" fill="none" stroke="#FFF6D6" stroke-width="1.3" opacity="0.9"/>
+      <g stroke="url(#gold)" stroke-width="1.4" stroke-linecap="round" opacity="0.9">
+        <path d="M340 84 L346 70"/> <path d="M354 72 L362 60"/> <path d="M368 62 L378 52"/>
+        <path d="M336 92 L350 92"/> <path d="M350 80 L364 79"/>
+      </g>
+    </g>
+  </defs>
+
+  <!-- the card: black stock, gold edges, a faint lattice in the margin -->
+  <rect x="3" y="3" width="494" height="694" rx="34" fill="#0C090A"/>
+  <rect x="3" y="3" width="494" height="694" rx="34" fill="url(#lattice)"/>
+  <rect x="3" y="3" width="494" height="694" rx="34" fill="none" stroke="url(#gold)" stroke-width="5"/>
+  <rect x="15" y="15" width="470" height="670" rx="24" fill="none" stroke="#E3B23C" stroke-opacity="0.35" stroke-width="1.2"/>
+
+  <g clip-path="url(#topHalf)"><use href="#half"/></g>
+  <g transform="rotate(180 250 350)"><g clip-path="url(#topHalf)"><use href="#half"/></g></g>
+
+  <!-- frame, centre band and the heart seal -->
+  <rect x="92" y="44" width="316" height="612" fill="none" stroke="url(#gold)" stroke-width="4"/>
+  <rect x="99" y="51" width="302" height="598" fill="none" stroke="#E3B23C" stroke-opacity="0.45" stroke-width="1"/>
+  <line x1="92" y1="347" x2="408" y2="347" stroke="url(#gold)" stroke-width="1.6"/>
+  <line x1="92" y1="353" x2="408" y2="353" stroke="url(#gold)" stroke-width="1.6"/>
+  <circle cx="250" cy="350" r="25" fill="#0C090A" stroke="url(#gold)" stroke-width="3"/>
+  <circle cx="250" cy="350" r="19" fill="none" stroke="#E3B23C" stroke-opacity="0.6" stroke-width="1"/>
+  <use href="#heart" transform="translate(236.5 337.5) scale(0.27)" fill="#E0263F" filter="url(#soft)"/>
+
+  <!-- indices -->
+  <g id="index">
+    <text x="49" y="104" text-anchor="middle" font-family="DejaVu Serif, Georgia, serif" font-weight="700" font-size="78" fill="#E0263F" stroke="#FBE7A1" stroke-width="1.1" filter="url(#soft)">J</text>
+    <use href="#heart" transform="translate(30 118) scale(0.38)" fill="#E0263F" filter="url(#soft)"/>
+  </g>
+  <use href="#index" transform="rotate(180 250 350)"/>
+</svg>

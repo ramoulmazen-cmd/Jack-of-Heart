@@ -1,0 +1,14 @@
+{
+  "name": "jack-of-hearts",
+  "version": "5.9.0",
+  "private": true,
+  "description": "Jack of Hearts: Solitary Confinement. Run `npm start`, then open the address it prints on every phone.",
+  "type": "module",
+  "scripts": {
+    "start": "node server/src/index.js",
+    "test": "npm --prefix server test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

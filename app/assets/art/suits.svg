@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 100">
+  <!-- The four suits, drawn for the game. The PNGs in assets/suits are made from these. -->
+  <symbol id="hearts" viewBox="0 0 100 100"><path d="M50 92 C36 79 4 59 4 33 C4 16 16 6 30 6 C40 6 47 12 50 20 C53 12 60 6 70 6 C84 6 96 16 96 33 C96 59 64 79 50 92 Z"/></symbol>
+  <symbol id="diamonds" viewBox="0 0 100 100"><path d="M50 3 C58 18 71 35 86 50 C71 65 58 82 50 97 C42 82 29 65 14 50 C29 35 42 18 50 3 Z"/></symbol>
+  <symbol id="spades" viewBox="0 0 100 100"><path d="M50 4 C58 20 96 37 96 61 C96 75 86 84 73 84 C64 84 57 80 53 73 C54 83 58 91 67 96 L33 96 C42 91 46 83 47 73 C43 80 36 84 27 84 C14 84 4 75 4 61 C4 37 42 20 50 4 Z"/></symbol>
+  <symbol id="clubs" viewBox="0 0 100 100"><circle cx="50" cy="27" r="21"/><circle cx="26" cy="58" r="21"/><circle cx="74" cy="58" r="21"/><path d="M50 34 L32 60 L68 60 Z"/><path d="M46 56 C46 74 42 87 33 96 L67 96 C58 87 54 74 54 56 Z"/></symbol>
+  <use href="#hearts" x="0" y="0" width="100" height="100" fill="#16140F"/>
+  <use href="#diamonds" x="100" y="0" width="100" height="100" fill="#16140F"/>
+  <use href="#spades" x="200" y="0" width="100" height="100" fill="#16140F"/>
+  <use href="#clubs" x="300" y="0" width="100" height="100" fill="#16140F"/>
+</svg>

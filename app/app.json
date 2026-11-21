@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "Jack of Hearts",
+    "slug": "jack-of-hearts",
+    "version": "5.9.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#17211C",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.jackofhearts.game",
+      "adaptiveIcon": {
+        "backgroundColor": "#17211C",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "name": "Jack of Hearts",
+      "backgroundColor": "#17211C",
+      "themeColor": "#17211C"
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Take a photo for your player picture.",
+          "photosPermission": "Choose a photo for your player picture.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-status-bar"
+    ]
+  }
+}
