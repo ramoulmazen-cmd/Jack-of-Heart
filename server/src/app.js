@@ -14,8 +14,10 @@ const LAN_CACHE_MS = 15_000;
  * HTTP + Socket.IO wiring around the pure Game class.
  * timeScale shrinks every phase timer (tests use 0.01 so a 3-minute discussion lasts 1.8 s).
  * lanAddresses() lists this device's network addresses, for the "join at" link in the lobby.
+ * publicUrl, when the game is hosted online (e.g. https://jack.onrender.com), is the "join at"
+ * link instead: a cloud server's own network addresses are private and no phone can reach them.
  */
-export function createGameServer({ timeScale = 1, webDir, lanAddresses = () => [] } = {}) {
+export function createGameServer({ timeScale = 1, webDir, lanAddresses = () => [], publicUrl = null } = {}) {
   const app = express();
   const httpServer = createServer(app);
   const io = new Server(httpServer, { cors: { origin: '*' } });
@@ -26,6 +28,7 @@ export function createGameServer({ timeScale = 1, webDir, lanAddresses = () => [
   let learned = null;
   let lanCache = { at: 0, list: [] };
   function joinUrl() {
+    if (publicUrl) return publicUrl;
     if (Date.now() - lanCache.at > LAN_CACHE_MS) lanCache = { at: Date.now(), list: lanAddresses() };
     const address = learned?.address ?? lanCache.list[0];
     const port = learned?.port ?? httpServer.address()?.port;

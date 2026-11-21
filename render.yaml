@@ -1,0 +1,13 @@
+# Render blueprint: hosts the game online so phones can play from anywhere.
+# Render → New → Blueprint → pick this repo. It builds the web version and starts the server.
+services:
+  - type: web
+    name: jack-of-hearts
+    runtime: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "24"

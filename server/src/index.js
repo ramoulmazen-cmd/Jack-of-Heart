@@ -9,7 +9,9 @@ const host = process.env.HOST || '0.0.0.0';
 
 // The ready-built browser version of the game. The server hands it to every phone.
 const webDir = fileURLToPath(new URL('../../app/dist', import.meta.url));
-const { httpServer } = createGameServer({ webDir, lanAddresses });
+// Hosted online: the public address friends open. Render sets RENDER_EXTERNAL_URL by itself.
+const publicUrl = (process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/+$/, '') || null;
+const { httpServer } = createGameServer({ webDir, lanAddresses, publicUrl });
 
 httpServer.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {

@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node server/src/index.js",
+    "build": "npm --prefix server ci --omit=dev && npm --prefix app ci && cd app && npx expo export --platform web",
     "test": "npm --prefix server test"
   },
   "engines": {
