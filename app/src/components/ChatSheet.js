@@ -1,9 +1,85 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { color } from '../theme';
+import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SUIT_IMAGES, TINT_OF } from '../suitImages';
+import { color, SUITS, suitInk, suitOnWall } from '../theme';
 import { useChatContext } from '../useChat';
 import { Avatar } from './Avatar';
 import { Sheet } from './Sheet';
+
+/** The server refuses longer messages (CHAT_MAX_WORDS); a suit on its own counts as one word. */
+export const MAX_WORDS = 10;
+
+// Suits travel as these characters, but are always drawn as the game's own images: many phones
+// have no font for ♠♥♦♣ and would show nothing.
+const SYMBOL_OF = { spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣' };
+const SUIT_OF = { '♠': 'spades', '♥': 'hearts', '♦': 'diamonds', '♣': 'clubs', '♤': 'spades', '♡': 'hearts', '♢': 'diamonds', '♧': 'clubs' };
+const SUIT_CHARS = /([♠♥♦♣♤♡♢♧])/;
+
+/** Ready-made lines for the things everyone says in this game. Tap one to add it. */
+const PHRASES = [
+  'Your card is',
+  'What’s my card?',
+  'I think it’s',
+  'Are you sure?',
+  'Tell me yours first',
+  'I trust you',
+  'Trust me',
+  'You lied to me',
+  'Someone lied',
+  'I’m not the Jack',
+  'You’re the Jack',
+  'Who’s the Jack?',
+  'Vote with me',
+  'Choose me',
+  'Yes',
+  'No',
+];
+
+const countWords = (text) => (text.trim() ? text.trim().split(/\s+/).length : 0);
+
+/** For one-line previews, where an image can't go: the suit's name instead of its symbol. */
+const plainSuits = (text) => text.replace(/[♠♥♦♣♤♡♢♧]/g, (c) => SUIT_OF[c]);
+
+function SuitGlyph({ suit, size, tint }) {
+  return (
+    <Image
+      source={SUIT_IMAGES[suit][TINT_OF[tint] ?? 'chalk']}
+      style={{ width: size, height: size }}
+      resizeMode="contain"
+      accessible={false}
+    />
+  );
+}
+
+/** A message's words, with every suit symbol drawn as an image. */
+function MessageText({ text, mine }) {
+  const words = text.split(/\s+/).filter(Boolean);
+  return (
+    <View style={styles.words} aria-label={plainSuits(text)}>
+      {words.map((word, i) => (
+        <View key={i} style={styles.word}>
+          {word
+            .split(SUIT_CHARS)
+            .filter(Boolean)
+            .map((piece, j) =>
+              SUIT_OF[piece] ? (
+                <SuitGlyph
+                  key={j}
+                  suit={SUIT_OF[piece]}
+                  size={18}
+                  tint={mine ? suitInk(SUIT_OF[piece]) : suitOnWall(SUIT_OF[piece])}
+                />
+              ) : (
+                <Text key={j} style={[styles.bubbleText, mine && styles.mineText]}>
+                  {piece}
+                </Text>
+              ),
+            )}
+        </View>
+      ))}
+    </View>
+  );
+}
 
 const CLOSED = {
   cell: 'No talking in the cell. You can read, not write.',
@@ -60,7 +136,7 @@ function People({ state, chat }) {
                 {p.name}
               </Text>
               <Text style={[styles.preview, unread > 0 && styles.previewNew]} numberOfLines={1}>
-                {last ? `${last.from === chat.me ? 'You: ' : ''}${last.text}` : gone(p) ? 'Out' : 'No messages yet'}
+                {last ? `${last.from === chat.me ? 'You: ' : ''}${plainSuits(last.text)}` : gone(p) ? 'Out' : 'No messages yet'}
               </Text>
             </View>
             {unread ? (
@@ -89,7 +165,7 @@ function Conversation({ chat, other }) {
           <View key={m.id}>
             {newTurn ? <Text style={styles.turn}>Turn {m.turn}</Text> : null}
             <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
-              <Text style={[styles.bubbleText, mine && styles.mineText]}>{m.text}</Text>
+              <MessageText text={m.text} mine={mine} />
             </View>
           </View>
         );
@@ -106,9 +182,14 @@ function Composer({ chat, other }) {
   const closed = chat.closedReason ? CLOSED[chat.closedReason] : out ? `${other.name} is out, and the dead stay silent.` : null;
   if (closed) return <Text style={styles.closed}>{closed}</Text>;
 
+  const words = countWords(draft);
+  const tooLong = words > MAX_WORDS;
+  // Add a ready-made phrase or a suit to the end of the message.
+  const add = (piece) => setDraft((d) => (d.trim() ? `${d.trimEnd()} ${piece}` : piece));
+
   const send = async () => {
     const text = draft.trim();
-    if (!text || busy) return;
+    if (!text || busy || tooLong) return;
     setBusy(true);
     setError(null);
     try {
@@ -124,6 +205,40 @@ function Composer({ chat, other }) {
   return (
     <>
       {error ? <Text style={styles.error}>{error}</Text> : null}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.phrases}
+      >
+        {PHRASES.map((phrase) => (
+          <Pressable
+            key={phrase}
+            role="button"
+            aria-label={`Add: ${phrase}`}
+            onPress={() => add(phrase)}
+            style={({ pressed }) => [styles.phrase, pressed && styles.pressed]}
+          >
+            <Text style={styles.phraseText}>{phrase}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+      <View style={styles.tools}>
+        {SUITS.map((suit) => (
+          <Pressable
+            key={suit}
+            role="button"
+            aria-label={`Add ${suit}`}
+            onPress={() => add(SYMBOL_OF[suit])}
+            style={({ pressed }) => [styles.suit, pressed && styles.pressed]}
+          >
+            <SuitGlyph suit={suit} size={22} tint={suitOnWall(suit)} />
+          </Pressable>
+        ))}
+        <Text style={[styles.count, tooLong && styles.countOver]} aria-live="polite">
+          {words}/{MAX_WORDS} words
+        </Text>
+      </View>
       <View style={styles.composer}>
         <TextInput
           aria-label="Message"
@@ -142,8 +257,8 @@ function Composer({ chat, other }) {
           role="button"
           aria-label="Send"
           onPress={send}
-          disabled={!draft.trim() || busy}
-          style={({ pressed }) => [styles.send, (!draft.trim() || busy) && styles.sendOff, pressed && styles.pressed]}
+          disabled={!draft.trim() || busy || tooLong}
+          style={({ pressed }) => [styles.send, (!draft.trim() || busy || tooLong) && styles.sendOff, pressed && styles.pressed]}
         >
           <Text style={styles.sendText}>Send</Text>
         </Pressable>
@@ -202,6 +317,30 @@ const styles = StyleSheet.create({
   theirs: { alignSelf: 'flex-start', backgroundColor: color.wall, borderWidth: 1, borderColor: color.wallLine, borderBottomLeftRadius: 5 },
   bubbleText: { color: color.chalk, fontSize: 16, lineHeight: 22 },
   mineText: { color: color.ink },
+  words: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 5 },
+  word: { flexDirection: 'row', alignItems: 'center' },
+
+  phrases: { gap: 6, paddingBottom: 8 },
+  phrase: {
+    borderWidth: 1.5,
+    borderColor: color.wallLine,
+    borderRadius: 14,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  phraseText: { color: color.chalk, fontSize: 14, fontWeight: '700' },
+  tools: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  suit: {
+    width: 40,
+    height: 36,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: color.wallLine,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  count: { marginLeft: 'auto', color: color.faded, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  countOver: { color: color.alarm },
 
   closed: { color: color.alarm, fontSize: 15, lineHeight: 21, textAlign: 'center', paddingVertical: 10 },
   error: { color: color.alarm, fontSize: 14, textAlign: 'center' },

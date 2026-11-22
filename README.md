@@ -54,9 +54,21 @@ Recent Android versions don't let Termux read the phone's own network address. I
 5. **Cell.** Your notes are on screen. Pick your own suit. Wrong, or no answer, and you're out. This is the only place your lifeline works, and it doesn't on the last turn.
 6. **Results.** ALIVE, DEAD or SAFE in the middle of the screen; everyone's mugshot shows who's still in.
 
-**Private chat.** Tap **Chat** at the top of the screen (on the countdown, choosing, the talk and the cell) to message any living player. Only the two of you ever see a conversation, and nobody else's phone is even told that you're talking. It's open the whole game except in your cell (you can still read there), and the dead can't write. The number on **Chat** counts the messages you haven't read.
+**Private chat.** Tap **Chat** at the top of the screen (on the countdown, choosing, the talk and the cell) to message any living player. Only the two of you ever see a conversation, and nobody else's phone is even told that you're talking. It's open the whole game except in your cell (you can still read there), and the dead can't write. The number on **Chat** counts the messages you haven't read. A message is at most **10 words**; tap a ready-made phrase ("Your card is", "I trust you", "You lied to me" …) or a suit button to add it.
 
 The moment the Jack is out, everyone still in wins. The Jack wins by surviving until one other player is left, or until the turns run out. Once per game, in your cell, you can peek at your own card (Lifeline), except on the last turn. One secret turn has the collars off; it's never the last turn. Cards are dealt fresh every turn: repeats and streaks are normal.
+
+**The Jack can't always see.** Everyone knows how many of these there are (the lobby shows the settings), but only the Jack learns which turns:
+
+- **Colour turns** (default 2): the Jack sees only **red** or **black**, in the lights and on the cards he holds. He still has to tell those players something, and a wrong suit in the right colour is his signature.
+- **Blank turn** (default 1): one of the 2 cards he holds is blank.
+- **Fakes** (default 2 a game): while choosing, the Jack holds a player's picture for 1 second, and one of the people holding that player's card sees a false suit on it, in the lights and the talk. That holder then tells the wrong suit without knowing it. Not on his colour or blank turns, so he can't use a fake to hide his own guess. If nobody but the Jack holds that card, the fake is given back.
+
+Holding **Role** (while choosing or in the talk) tells the Jack this turn's sight and what his fake did.
+
+**Interrogation vote** (on by default). Once a game, during the countdown, more than half of the living players can vote one player into interrogation for that turn: nobody holds their card, it's hidden in the lights, they see no cards and can't use their lifeline, so they guess their suit alone. Tap a card in the countdown to vote; the counts show, never who voted. The vote opens right after the first half of the game if nobody died in it (8 turns: from turn 5), otherwise 2 turns before the end (8 turns: turn 6), and only with more than 4 players left.
+
+The host sets all of these in **Settings**: colour turns, blank turns, fakes (0 turns each one off) and the interrogation vote on or off.
 
 House rules: never show your screen, no talking in the cell, the dead stay silent.
 
@@ -83,6 +95,14 @@ Under it, **Reveal it at the end** decides what the Game Over screen says. On (t
 | Cheating | Reflective surfaces banned | The lights last a few seconds, the cards you keep show only while you hold them, and showing your screen is banned |
 | Private talk | Anywhere in the prison, face to face | A private chat between any two living players, closed in the cell |
 | Extras | — | Mugshots, one lifeline each, one secret safe turn, private notes |
+
+## Version 6.0
+
+- **The Jack can't always see.** Colour turns (red or black only), a blank turn (one held card blank) and fakes (a holder sees a false suit). A Jack who never lies used to win almost every game; now he has to say something on turns he can't see, and his mistakes point at him.
+- **Interrogation vote.** Once a game, in the countdown, a majority can send one player into interrogation: no holders, no lifeline.
+- **Host settings** for all of these, shown to everyone in the lobby.
+- **Shorter private chat.** 10 words a message, with ready-made phrases and suit buttons; suits in messages are drawn as images.
+- **A Role button while choosing**, the same for everyone.
 
 ## Version 5.9
 

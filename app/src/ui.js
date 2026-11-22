@@ -330,6 +330,32 @@ export function Card({ size, suit, back = false, out = false, selected = false, 
     );
   }
 
+  // The Jack's limited sight: a blank card, or only the colour. Face up, but no suit on it.
+  if (suit === 'blank' || suit === 'red' || suit === 'black') {
+    const blot = Math.round(size * 0.42);
+    return (
+      <View aria-label={`${suit} card`} style={[styles.card, styles.cardFace, frame, selected && styles.cardSelected]}>
+        {suit === 'blank' ? (
+          <Text style={[styles.blankMark, { fontSize: Math.round(size * 0.42) }]}>?</Text>
+        ) : (
+          <>
+            <View
+              style={{
+                width: blot,
+                height: blot,
+                borderRadius: blot / 2,
+                backgroundColor: suit === 'red' ? color.red : color.ink,
+              }}
+            />
+            <Text style={[styles.colourWord, { fontSize: Math.max(9, Math.round(size * 0.13)) }]}>
+              {suit === 'red' ? 'RED' : 'BLACK'}
+            </Text>
+          </>
+        )}
+      </View>
+    );
+  }
+
   const ink = suitInk(suit);
   const corner = Math.max(4, Math.round(size * 0.14));
   const inset = { top: Math.round(size * 0.07), left: Math.round(size * 0.08) };
@@ -471,6 +497,8 @@ const styles = StyleSheet.create({
 
   card: { alignItems: 'center', justifyContent: 'center' },
   cardFace: { backgroundColor: color.stock },
+  blankMark: { color: color.faded, fontWeight: '900' },
+  colourWord: { color: color.ink, fontWeight: '900', letterSpacing: 1, marginTop: 6 },
   cardSelected: { borderWidth: 3, borderColor: color.paint, transform: [{ translateY: -10 }] },
   cardOut: { backgroundColor: color.wallRaised, borderWidth: 1, borderColor: color.wallLine, overflow: 'hidden' },
   cardBack: { backgroundColor: color.noir, borderWidth: 1.5, borderColor: color.paint, overflow: 'hidden' },

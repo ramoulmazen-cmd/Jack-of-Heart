@@ -249,6 +249,20 @@ export function createGameServer({ timeScale = 1, webDir, lanAddresses = () => [
       sendTo(room, playerId);
     });
 
+    // The Jack's fake, while choosing. Only his own view changes, so only he is told.
+    handle('turn:fake', ({ target }) => {
+      const { room, game, playerId } = current();
+      game.fakeCard(playerId, target);
+      sendTo(room, playerId);
+    });
+
+    // The interrogation vote, during the countdown. Everyone sees the counts move.
+    handle('turn:vote', ({ target }) => {
+      const { room, game, playerId } = current();
+      game.vote(playerId, target ?? null);
+      broadcast(room);
+    });
+
     // A private message goes to its two players and nobody else, and it changes no one's state,
     // so there's no broadcast: the other phones can't even tell that two players are talking.
     // The sender gets it back in the reply, the receiver as a 'chat:message' event.

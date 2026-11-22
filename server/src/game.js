@@ -29,6 +29,8 @@ export const COOLDOWN_SECONDS = 45;
 
 /** Private messages: how long one can be, how many each pair keeps, and how fast you can send. */
 export const CHAT_MAX_LENGTH = 200;
+/** Short and sharp: a message is at most 10 words (a suit symbol on its own counts as one). */
+export const CHAT_MAX_WORDS = 10;
 export const CHAT_HISTORY = 100;
 export const CHAT_BURST = 5;
 export const CHAT_BURST_MS = 5000;
@@ -40,7 +42,19 @@ export const SETTING_LIMITS = {
   discussionSeconds: { min: 30, max: 3600, default: 180 },
   answerSeconds: { min: 10, max: 300, default: 30 },
   maxTurns: { min: 2, max: 50, default: 8 },
+  // The Jack's limits. Everyone sees how many; only the Jack learns which turns they hit.
+  // On a blank turn one of the 2 cards he holds shows blank; on a colour turn he sees only red or
+  // black. Either way he still has to tell those players something, and a wrong answer points at him.
+  blankTurns: { min: 0, max: 3, default: 1 },
+  colorTurns: { min: 0, max: 5, default: 2 },
+  // How many times a game the Jack can make one holder see a false suit on someone's card.
+  fakeSuits: { min: 0, max: 5, default: 2 },
 };
+
+/** On/off rules everyone can see. `interrogation`: once a game, the table can vote one player alone. */
+export const PUBLIC_SWITCHES = { interrogation: true };
+
+const RED_SUITS = new Set(['hearts', 'diamonds']);
 
 /**
  * On/off settings that only the host is told about. `blackout` is the Jack's secret power:
@@ -75,6 +89,7 @@ export class Game {
     this.gameNumber = 0;
     this.settings = {
       ...Object.fromEntries(Object.entries(SETTING_LIMITS).map(([key, limit]) => [key, limit.default])),
+      ...PUBLIC_SWITCHES,
       ...SECRET_SWITCHES,
     };
     this.#resetRound();
@@ -89,8 +104,13 @@ export class Game {
     return this.alivePlayers.filter((p) => !p.left);
   }
 
+  /** Active, minus whoever is in interrogation this turn: they choose, hold and are held. */
+  get seatedPlayers() {
+    return this.activePlayers.filter((p) => p.id !== this.interrogated);
+  }
+
   get everyoneChose() {
-    return this.activePlayers.every((p) => this.locks.has(p.id));
+    return this.seatedPlayers.every((p) => this.locks.has(p.id));
   }
 
   get everyoneAnswered() {
@@ -192,7 +212,7 @@ export class Game {
       }
       this.settings[key] = Math.min(limit.max, Math.max(limit.min, value));
     }
-    for (const key of Object.keys(SECRET_SWITCHES)) {
+    for (const key of [...Object.keys(PUBLIC_SWITCHES), ...Object.keys(SECRET_SWITCHES)]) {
       if (changes?.[key] === undefined) continue;
       if (typeof changes[key] !== 'boolean') throw new GameError('BAD_SETTINGS', `${key} must be on or off.`);
       this.settings[key] = changes[key];
@@ -210,6 +230,13 @@ export class Game {
     // One secret turn in which collars are off. Nobody learns which until it's over. Never the
     // last turn: with nobody dying on it, the turns would just run out and hand the Jack the game.
     this.safeTurn = 1 + this.#rng(this.settings.maxTurns - 1);
+    // The Jack's colour and blank turns: different turns, never the last. If there are more than
+    // turns to hold them, colour turns come first and the rest are dropped.
+    const turns = this.#shuffle(Array.from({ length: this.settings.maxTurns - 1 }, (_, i) => i + 1));
+    const colors = Math.min(this.settings.colorTurns, turns.length);
+    this.colorTurnSet = new Set(turns.slice(0, colors));
+    this.blankTurnSet = new Set(turns.slice(colors, colors + this.settings.blankTurns));
+    this.fakesLeft = this.settings.fakeSuits;
     this.gameNumber += 1;
     this.#beginTurn();
   }
@@ -223,6 +250,9 @@ export class Game {
     this.#requirePhase('choose', 'Choosing is over for this turn.');
     const player = this.players.get(playerId);
     if (!player?.alive || player.left) throw new GameError('NOT_ALIVE', 'Only living players choose.');
+    if (playerId === this.interrogated) {
+      throw new GameError('INTERROGATED', 'You are in interrogation: nobody sees your card this turn.');
+    }
     if (this.locks.has(playerId)) throw new GameError('LOCKED', 'You already locked in your choice.');
     if (!Array.isArray(ranking) || ranking.length === 0) {
       throw new GameError('BAD_TARGET', 'Choose at least one person.');
@@ -238,8 +268,96 @@ export class Game {
       if (id === playerId) throw new GameError('BAD_TARGET', 'Choose someone other than yourself.');
       const target = this.players.get(id);
       if (!target?.alive || target.left) throw new GameError('BAD_TARGET', 'That player is not in the game.');
+      if (id === this.interrogated) throw new GameError('BAD_TARGET', `${target.name} is in interrogation this turn.`);
     }
     this.locks.set(playerId, [...ranking]);
+  }
+
+  /** This turn's limit on the Jack's sight: 'color', 'blank' or null. */
+  get jackSight() {
+    if (this.colorTurnSet.has(this.turn)) return 'color';
+    if (this.blankTurnSet.has(this.turn)) return 'blank';
+    return null;
+  }
+
+  /**
+   * The Jack's fake, while everyone is choosing: one of the players holding `targetId`'s card (never
+   * the Jack) will see a false suit on it, in the lights and in the talk. Who, and which suit, is
+   * settled when the cards are dealt; the Jack is told. Not on his own colour or blank turns: he
+   * could guess a suit and have the other holder see the same guess, and his mistake would vanish.
+   */
+  fakeCard(playerId, targetId) {
+    const player = this.players.get(playerId);
+    if (playerId !== this.jackId || this.settings.fakeSuits === 0 || !player?.alive || player.left) {
+      throw new GameError('NOT_ALLOWED', 'You can’t do that.');
+    }
+    this.#requirePhase('choose', 'You can only fake a card while everyone is choosing.');
+    if (this.jackSight) throw new GameError('FAKE_LOCKED', 'No fakes on a turn you can’t see clearly.');
+    if (this.fakeTarget !== null) throw new GameError('FAKE_USED', 'One fake per turn.');
+    if (this.fakesLeft <= 0) throw new GameError('NO_FAKES', 'You have no fakes left.');
+    const target = this.players.get(targetId);
+    if (!target?.alive || target.left || targetId === playerId || targetId === this.interrogated) {
+      throw new GameError('BAD_TARGET', 'You can’t fake that card.');
+    }
+    this.fakeTarget = targetId;
+    this.fakesLeft -= 1;
+  }
+
+  /**
+   * The interrogation vote is open during the countdown, once a game, with more than 4 players in:
+   * right after the first half if nobody died in it, otherwise from 2 turns before the end.
+   * A player that more than half the table votes for spends the next turn alone (see #resolveVote).
+   */
+  get interrogationOpen() {
+    if (!this.settings.interrogation || this.interrogationUsed || this.phase !== 'cooldown') return false;
+    if (this.activePlayers.length <= 4) return false;
+    const total = this.settings.maxTurns;
+    const half = Math.floor(total / 2);
+    const quietFirstHalf = ![...this.players.values()].some((p) => p.diedOnTurn !== null && p.diedOnTurn <= half);
+    return (quietFirstHalf && this.turn > half) || this.turn >= total - 2;
+  }
+
+  get votesNeeded() {
+    return Math.floor(this.activePlayers.length / 2) + 1;
+  }
+
+  /** Vote for who goes into interrogation, or null to take your vote back. Votes are counted, not named. */
+  vote(playerId, targetId) {
+    if (!this.interrogationOpen) throw new GameError('VOTE_CLOSED', 'There is no interrogation vote right now.');
+    const voter = this.players.get(playerId);
+    if (!voter?.alive || voter.left) throw new GameError('NOT_ALIVE', 'Only living players vote.');
+    if (targetId === null) {
+      this.votes.delete(playerId);
+      return;
+    }
+    const target = this.players.get(targetId);
+    if (!target?.alive || target.left) throw new GameError('BAD_TARGET', 'That player is not in the game.');
+    if (targetId === playerId) throw new GameError('BAD_TARGET', 'Vote for someone else.');
+    this.votes.set(playerId, targetId);
+  }
+
+  #tally() {
+    const active = new Set(this.activePlayers.map((p) => p.id));
+    const tally = new Map();
+    for (const [voter, target] of this.votes) {
+      if (active.has(voter) && active.has(target)) tally.set(target, (tally.get(target) ?? 0) + 1);
+    }
+    return tally;
+  }
+
+  /** When the countdown ends: a majority sends its player into interrogation for this turn. */
+  #resolveVote() {
+    if (this.interrogationOpen) {
+      for (const [target, count] of this.#tally()) {
+        if (count >= this.votesNeeded) {
+          this.interrogated = target;
+          this.interrogationUsed = true;
+          this.interrogationTurn = this.turn;
+          break;
+        }
+      }
+    }
+    this.votes = new Map();
   }
 
   /** The turn limit's turn: no lifelines, no blackout, and never the safe turn. */
@@ -258,6 +376,7 @@ export class Game {
     if (!player?.alive || player.left) throw new GameError('NOT_ALIVE', 'Dead players have no card.');
     if (this.lastTurn) throw new GameError('LAST_TURN', 'There are no lifelines on the last turn.');
     if (player.lifelineUsed) throw new GameError('LIFELINE_USED', 'You already used your lifeline this game.');
+    if (playerId === this.interrogated) throw new GameError('INTERROGATED', 'No lifeline in interrogation.');
     if (player.answer !== null) throw new GameError('LOCKED', 'Your answer is already locked in.');
     player.lifelineUsed = true;
     if (this.blackoutTurn === this.turn && player.id !== this.jackId) {
@@ -352,6 +471,8 @@ export class Game {
   /** Move to the next phase. Called by the server when the phase timer runs out. */
   advance() {
     if (this.phase === 'cooldown') {
+      this.#resolveVote();
+      this.#sizeTurn();
       this.#enter('choose', CHOOSE_SECONDS);
     } else if (this.phase === 'choose') {
       this.#dealVision();
@@ -385,8 +506,12 @@ export class Game {
     const alive = me?.alive === true && !me.left;
     const visionDealt = VISION_PHASES.includes(this.phase) && alive;
     const mine = visionDealt ? this.sees.get(viewerId) ?? [] : [];
+    // Interrogation: that player sees no card, and nobody sees theirs.
+    const isolated = viewerId === this.interrogated;
     let visible = [];
-    if (alive && this.phase === 'lights') visible = this.activePlayers.map((p) => p.id).filter((id) => id !== viewerId);
+    if (alive && !isolated && this.phase === 'lights') {
+      visible = this.seatedPlayers.map((p) => p.id).filter((id) => id !== viewerId);
+    }
     if (alive && this.phase === 'discussion') visible = mine;
     const shown = new Set(visible);
     const showDeaths = this.phase === 'reveal' || this.phase === 'over';
@@ -398,6 +523,9 @@ export class Game {
     if (viewerId !== hostId) for (const key of Object.keys(SECRET_SWITCHES)) delete settings[key];
     // Only the Jack hears about the blackout, and only while it's switched on.
     const blackout = me && me.id === this.jackId && this.settings.blackout ? { blackout: this.#blackoutStatus() } : {};
+    // Only the Jack hears about his own sight and fakes.
+    const powers = me && me.id === this.jackId && this.phase !== 'lobby' ? { powers: this.#jackPowers() } : {};
+    const voteOpen = this.interrogationOpen;
     return {
       code: this.code,
       gameNumber: this.gameNumber,
@@ -432,7 +560,20 @@ export class Game {
             safeResult: safe ? this.safeResults.get(me.id) ?? null : null,
             // Why you can't send a private message right now ('lobby', 'cell', 'dead'), or null.
             chatClosed: this.chatClosedFor(me),
+            interrogated: isolated,
             ...blackout,
+            ...powers,
+          }
+        : null,
+      // The vote: how many votes each player has (never who cast them), and your own.
+      interrogation: this.settings.interrogation
+        ? {
+            open: voteOpen,
+            needed: this.votesNeeded,
+            votes: voteOpen ? Object.fromEntries(this.#tally()) : {},
+            yourVote: voteOpen ? this.votes.get(viewerId) ?? null : null,
+            used: this.interrogationUsed,
+            playerId: this.interrogated,
           }
         : null,
       players: [...this.players.values()].map((p) => ({
@@ -442,7 +583,7 @@ export class Game {
         connected: p.connected,
         left: p.left,
         photo: p.photo ? p.photoVersion : 0,
-        suit: shown.has(p.id) ? p.suit : null,
+        suit: shown.has(p.id) ? this.#suitSeenBy(viewerId, p) : null,
       })),
       deaths: showDeaths
         ? this.deaths.map((d) => (d.id === viewerId ? { ...d } : { id: d.id }))
@@ -472,15 +613,64 @@ export class Game {
     return thisTurn ? 'on' : 'used';
   }
 
+  /**
+   * What `viewerId` sees on `p`'s card. The Jack's fake changes it for one holder; on the Jack's
+   * colour turns he gets only 'red' or 'black', and on his blank turn one card he holds is 'blank'.
+   * The real suit never reaches a phone that isn't meant to see it.
+   */
+  #suitSeenBy(viewerId, p) {
+    if (this.fake?.viewerId === viewerId && this.fake.targetId === p.id) return this.fake.suit;
+    if (viewerId === this.jackId) {
+      const sight = this.jackSight;
+      if (sight === 'color') return RED_SUITS.has(p.suit) ? 'red' : 'black';
+      if (sight === 'blank' && p.id === this.blankCardOf) return 'blank';
+    }
+    return p.suit;
+  }
+
+  /**
+   * For the Jack only. `sight`: this turn's limit ('color', 'blank' or null). `fake`: once the cards
+   * are dealt, whose card he faked, who sees the false suit and which one; `viewerId` null means
+   * nobody else holds that card, so nothing happened and the fake was given back.
+   */
+  #jackPowers() {
+    const playing = this.phase !== 'over';
+    return {
+      sight: playing ? this.jackSight : null,
+      fakesLeft: this.settings.fakeSuits ? this.fakesLeft : 0,
+      fakeTarget: playing ? this.fakeTarget : null,
+      fake: VISION_PHASES.includes(this.phase) && this.fake ? { ...this.fake } : null,
+    };
+  }
+
+  /** 3 to rank and 2 viewers a card from 5 seated players, 1 and 1 below. */
+  #sizeTurn() {
+    const big = this.seatedPlayers.length >= RANKING_FROM;
+    this.maxChoices = big ? MAX_CHOICES : 1;
+    this.maxChosen = big ? MAX_CHOSEN : 1;
+  }
+
+  #shuffle(items) {
+    const out = [...items];
+    for (let i = out.length - 1; i > 0; i -= 1) {
+      const j = this.#rng(i + 1);
+      [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+  }
+
   #beginTurn() {
     this.turn += 1;
     this.deaths = [];
     this.locks = new Map();
     this.viewers = new Map();
     this.sees = new Map();
-    const big = this.activePlayers.length >= RANKING_FROM;
-    this.maxChoices = big ? MAX_CHOICES : 1;
-    this.maxChosen = big ? MAX_CHOSEN : 1;
+    this.interrogated = null;
+    this.votes = new Map();
+    this.fakeTarget = null;
+    this.fake = null;
+    this.blankCardOf = null;
+    this.#sizeTurn();
     for (const p of this.alivePlayers) {
       p.suit = SUITS[this.#rng(SUITS.length)];
       p.answer = null;
@@ -490,13 +680,34 @@ export class Game {
   }
 
   #dealVision() {
-    const ids = this.activePlayers.map((p) => p.id);
+    const ids = this.seatedPlayers.map((p) => p.id);
     // 4 or fewer: 1 and 1, your one viewer is the one you chose. From 5: 2 and 2.
     this.viewers =
       ids.length < RANKING_FROM
         ? pairViewers(ids, this.locks, this.#rng)
         : assignViewers(ids, resolveChoices(ids, this.locks, this.#rng), this.#rng);
     this.sees = cardsSeenBy(this.viewers);
+    if (this.jackSight === 'blank') {
+      const held = this.sees.get(this.jackId) ?? [];
+      this.blankCardOf = held.length ? held[this.#rng(held.length)] : null;
+    }
+    if (this.fakeTarget !== null) {
+      const entry = this.viewers.get(this.fakeTarget);
+      const holders = entry ? [entry.picked, entry.random].filter((v) => v && v !== this.jackId) : [];
+      const target = this.players.get(this.fakeTarget);
+      if (holders.length && target?.alive) {
+        const others = SUITS.filter((s) => s !== target.suit);
+        this.fake = {
+          targetId: this.fakeTarget,
+          viewerId: holders[this.#rng(holders.length)],
+          suit: others[this.#rng(others.length)],
+        };
+      } else {
+        // Nobody but the Jack holds that card (or it left the table): nothing to fake, so it's given back.
+        this.fake = { targetId: this.fakeTarget, viewerId: null, suit: null };
+        this.fakesLeft += 1;
+      }
+    }
     this.#enter('lights', ids.length <= SMALL_GAME ? LIGHTS_SECONDS_SMALL : LIGHTS_SECONDS);
   }
 
@@ -547,6 +758,16 @@ export class Game {
     this.result = null;
     this.blackoutTurn = null;
     this.blackoutVictims = [];
+    this.colorTurnSet = new Set();
+    this.blankTurnSet = new Set();
+    this.blankCardOf = null;
+    this.fakesLeft = 0;
+    this.fakeTarget = null;
+    this.fake = null;
+    this.interrogated = null;
+    this.interrogationUsed = false;
+    this.interrogationTurn = null;
+    this.votes = new Map();
     // Private messages belong to one game: a new game starts with an empty chat.
     this.chats = new Map();
     this.chatCount = 0;
@@ -574,6 +795,9 @@ function cleanMessage(raw) {
     .replace(/\n{3,}/g, '\n\n')
     .trim();
   if (!text) throw new GameError('EMPTY_MESSAGE', 'Type a message.');
+  if (text.split(/\s+/).length > CHAT_MAX_WORDS) {
+    throw new GameError('TOO_MANY_WORDS', `Keep it to ${CHAT_MAX_WORDS} words.`);
+  }
   // Cut by characters, not UTF-16 units, so an emoji is never split in half.
   return Array.from(text).slice(0, CHAT_MAX_LENGTH).join('');
 }

@@ -4,7 +4,7 @@ import { Avatar } from '../components/Avatar';
 import { Shake } from '../components/Effects';
 import { color, font } from '../theme';
 import { useChatContext } from '../useChat';
-import { Button, Card, Screen, TopBar, clockText, useSecondsLeft } from '../ui';
+import { Button, Card, ErrorText, Screen, TopBar, clockText, useAction, useSecondsLeft } from '../ui';
 
 const GAP = 10;
 const NOTICE_MS = 2600;
@@ -19,6 +19,10 @@ export default function CooldownScreen({ state, game }) {
   const chat = useChatContext();
   const left = useSecondsLeft(state.phaseEndsAt, game.clockOffset) ?? 0;
   const [tapped, setTapped] = useState(null); // { id, at }
+  const { error, run } = useAction();
+  // The interrogation vote, when it's open: tap a card to vote for that player, tap it again to take it back.
+  const poll = state.interrogation?.open ? state.interrogation : null;
+  const vote = (id) => run(() => game.vote(poll.yourVote === id ? null : id));
 
   useEffect(() => {
     if (!tapped) return undefined;
@@ -34,9 +38,14 @@ export default function CooldownScreen({ state, game }) {
   const byHeight = Math.floor((height - 470 - rows * 30) / (rows * 1.4));
   const size = Math.max(34, Math.min(104, byWidth, byHeight));
 
-  const footer = chat?.available ? (
-    <Button title="Private chat" kind="secondary" label="Open the private chat" onPress={() => chat.open()} />
-  ) : null;
+  const footer = (
+    <>
+      <ErrorText>{error}</ErrorText>
+      {chat?.available ? (
+        <Button title="Private chat" kind="secondary" label="Open the private chat" onPress={() => chat.open()} />
+      ) : null}
+    </>
+  );
 
   return (
     <Screen footer={footer}>
@@ -44,9 +53,16 @@ export default function CooldownScreen({ state, game }) {
       <View style={styles.clockBlock} aria-label={`Turn ${state.turn} starts in ${left} seconds`}>
         <Text style={styles.until}>Turn {state.turn} starts in</Text>
         <Text style={[styles.clock, left <= 10 && styles.clockSoon]}>{clockText(left)}</Text>
-        <Text style={styles.why}>Talk it over. Nobody chooses or sees a card until then.</Text>
+        {poll ? (
+          <Text style={[styles.why, styles.vote]}>
+            Interrogation vote is open, once a game. Tap a card to vote. {poll.needed} votes send that player alone
+            for this turn.
+          </Text>
+        ) : (
+          <Text style={styles.why}>Talk it over. Nobody chooses or sees a card until then.</Text>
+        )}
       </View>
-      <View style={styles.table} aria-label="The cards, face down until the turn starts">
+      <View style={[styles.table, poll && styles.tableVote]} aria-label="The cards, face down until the turn starts">
         {tapped ? (
           <View role="alert" style={styles.notice}>
             <Text style={styles.noticeText}>
@@ -55,16 +71,27 @@ export default function CooldownScreen({ state, game }) {
           </View>
         ) : null}
         <View style={[styles.cards, { gap: GAP }]}>
-          {cards.map((p) => (
+          {cards.map((p) => {
+            const votes = poll?.votes[p.id] ?? 0;
+            const mine = poll?.yourVote === p.id;
+            return (
             <Pressable
               key={p.id}
               role="button"
-              aria-label={`${p.name}'s card, face down`}
-              onPress={() => setTapped({ id: p.id, at: Date.now() })}
+              aria-label={poll ? `Vote for ${p.name}, ${votes} vote${votes === 1 ? '' : 's'}` : `${p.name}'s card, face down`}
+              aria-selected={mine}
+              onPress={() => (poll ? vote(p.id) : setTapped({ id: p.id, at: Date.now() }))}
               style={{ width: size, alignItems: 'center' }}
             >
               <Shake key={tapped?.id === p.id ? tapped.at : 'still'} strength={tapped?.id === p.id ? 8 : 0}>
-                <Card size={size} back />
+                <View style={mine && styles.voted}>
+                  <Card size={size} back />
+                </View>
+                {votes ? (
+                  <View style={[styles.votes, mine && styles.votesMine]}>
+                    <Text style={styles.votesText}>{votes}</Text>
+                  </View>
+                ) : null}
               </Shake>
               <View style={styles.owner}>
                 <Avatar player={p} size={18} />
@@ -73,7 +100,8 @@ export default function CooldownScreen({ state, game }) {
                 </Text>
               </View>
             </Pressable>
-          ))}
+            );
+          })}
         </View>
       </View>
     </Screen>
@@ -93,6 +121,25 @@ const styles = StyleSheet.create({
   },
   clockSoon: { color: color.alarm },
   why: { color: color.faded, fontSize: 15, lineHeight: 21, textAlign: 'center', maxWidth: 300 },
+  vote: { color: color.alarm, fontWeight: '700', maxWidth: 340 },
+  tableVote: { borderColor: color.alarm },
+  voted: { borderRadius: 8, borderWidth: 3, borderColor: color.alarm, margin: -3 },
+  votes: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    minWidth: 26,
+    height: 26,
+    borderRadius: 13,
+    paddingHorizontal: 6,
+    backgroundColor: color.chalk,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: color.wall,
+  },
+  votesMine: { backgroundColor: color.alarm },
+  votesText: { fontFamily: font.stencil, color: color.ink, fontSize: 16, lineHeight: 19 },
   table: {
     flex: 1,
     borderRadius: 20,

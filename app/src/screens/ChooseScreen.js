@@ -1,16 +1,34 @@
+import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, Vibration, View, useWindowDimensions } from 'react-native';
 import { Avatar, PlayerStrip } from '../components/Avatar';
 import { Stamp } from '../components/Effects';
+import { HoldButton } from '../components/HoldButton';
+import { Interrogated, InterrogationNote } from '../components/Interrogation';
+import { RoleOverlay } from '../components/Role';
 import { color, font } from '../theme';
 import { Button, CheckMark, ErrorText, Screen, TopBar, useAction } from '../ui';
+
+/** How long the Jack holds a picture to fake that player's card. Long enough not to happen by accident. */
+const FAKE_HOLD_MS = 1000;
 
 export default function ChooseScreen({ state, game }) {
   const { you, maxChoices } = state;
   const { busy, error, run } = useAction();
   const [ranking, setRanking] = useState([]);
+  const [showRole, setShowRole] = useState(false);
   const { width } = useWindowDimensions();
-  const options = state.players.filter((p) => p.alive && !p.left && p.id !== you.id);
+  const alone = state.interrogation?.playerId ?? null;
+  const options = state.players.filter((p) => p.alive && !p.left && p.id !== you.id && p.id !== alone);
+  // The Jack's fake: a long press on a picture, only he has it, and only on turns he sees clearly.
+  const { powers } = you;
+  const canFake = Boolean(powers && powers.fakesLeft > 0 && !powers.sight && !powers.fakeTarget);
+  const fake = (id) =>
+    run(async () => {
+      await game.fake(id);
+      if (Platform.OS === 'web') Vibration.vibrate(40);
+      else Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    });
   const stillHere = (id) => options.some((p) => p.id === id);
   const chosen = you.locked ? you.ranking ?? [] : ranking.filter(stillHere);
 
@@ -27,22 +45,51 @@ export default function ChooseScreen({ state, game }) {
   const tile = Math.floor((usable - 10 * (columns - 1)) / columns);
   const avatar = Math.min(76, tile - 26);
 
-  const footer = you.locked ? null : (
+  // Everyone has the same Role button, so the Jack checking his powers looks like anyone checking their role.
+  const role = (
+    <HoldButton
+      label="Role"
+      tint={color.chalk}
+      onHoldStart={() => setShowRole(true)}
+      onHoldEnd={() => setShowRole(false)}
+      style={styles.role}
+    />
+  );
+  const footer = you.interrogated ? (
+    <View style={styles.bar}>{role}</View>
+  ) : (
     <>
       <ErrorText>{error}</ErrorText>
-      <Button
-        title={chosen.length ? 'Lock in' : maxChoices === 1 ? 'Tap one' : `Tap up to ${maxChoices}`}
-        disabled={!chosen.length}
-        busy={busy}
-        onPress={() => run(() => game.choose(chosen))}
-      />
+      <View style={styles.bar}>
+        {role}
+        {you.locked ? null : (
+          <Button
+            title={chosen.length ? 'Lock in' : maxChoices === 1 ? 'Tap one' : `Tap up to ${maxChoices}`}
+            disabled={!chosen.length}
+            busy={busy}
+            onPress={() => run(() => game.choose(chosen))}
+            style={styles.lock}
+          />
+        )}
+      </View>
     </>
   );
 
+  if (you.interrogated) {
+    return (
+      <Screen footer={footer} overlay={showRole ? <RoleOverlay state={state} /> : null}>
+        <TopBar state={state} game={game} title="Choose" />
+        <PlayerStrip state={state} />
+        <Interrogated />
+      </Screen>
+    );
+  }
+
   return (
-    <Screen footer={footer}>
+    <Screen footer={footer} overlay={showRole ? <RoleOverlay state={state} /> : null}>
       <TopBar state={state} game={game} title="Choose" />
       <PlayerStrip state={state} />
+      <InterrogationNote state={state} />
       <Text style={styles.question}>Who sees your card?</Text>
       <Text style={styles.sub}>{maxChoices === 1 ? 'Pick one.' : 'Pick up to 3, best first.'}</Text>
       <ScrollView contentContainerStyle={styles.grid} showsVerticalScrollIndicator={false}>
@@ -55,8 +102,10 @@ export default function ChooseScreen({ state, game }) {
               role="button"
               aria-selected={on}
               aria-label={on ? `${p.name}, choice ${place + 1}` : p.name}
-              disabled={you.locked}
-              onPress={() => toggle(p.id)}
+              disabled={you.locked && !canFake}
+              onPress={() => (you.locked ? null : toggle(p.id))}
+              onLongPress={canFake ? () => fake(p.id) : undefined}
+              delayLongPress={FAKE_HOLD_MS}
               style={({ pressed }) => [styles.tile, { width: tile }, on && styles.tileOn, pressed && styles.pressed]}
             >
               <View>
@@ -115,5 +164,8 @@ const styles = StyleSheet.create({
   name: { color: color.chalk, fontSize: 15, fontWeight: '700', maxWidth: '92%' },
   nameOn: { color: color.paint },
   locked: { alignItems: 'center', gap: 6, paddingVertical: 10 },
+  bar: { flexDirection: 'row', gap: 8 },
+  role: { flex: 1 },
+  lock: { flex: 2 },
   wait: { color: color.faded, fontSize: 15 },
 });

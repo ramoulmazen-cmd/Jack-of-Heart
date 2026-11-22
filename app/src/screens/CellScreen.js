@@ -32,7 +32,11 @@ export default function CellScreen({ state, game, notes }) {
     <>
       <ErrorText>{error}</ErrorText>
       <View style={styles.bar}>
-        {state.lastTurn ? (
+        {state.you.interrogated ? (
+          <View style={[styles.lifeline, styles.noLifeline]} aria-label="No lifeline in interrogation">
+            <Text style={styles.noLifelineText}>Interrogation:{'\n'}no lifeline</Text>
+          </View>
+        ) : state.lastTurn ? (
           // Everyone gets the same note on the last turn, used lifeline or not, so a glance at a
           // screen never tells you who still had one.
           <View style={[styles.lifeline, styles.noLifeline]} aria-label="No lifelines on the last turn">

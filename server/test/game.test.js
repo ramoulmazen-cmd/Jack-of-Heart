@@ -21,10 +21,15 @@ function setup(count = 5) {
   return { game, players, host: players[0], tick: (ms) => (now += ms) };
 }
 
-/** Start a game. Tests decide the safe turn themselves; null means there isn't one. */
-function start(game, host, safeTurn = null) {
+/**
+ * Start a game. Tests decide the safe turn and the Jack's colour and blank turns themselves;
+ * by default there are none.
+ */
+function start(game, host, safeTurn = null, { color = [], blank = [] } = {}) {
   game.start(host.id);
   game.safeTurn = safeTurn;
+  game.colorTurnSet = new Set(color);
+  game.blankTurnSet = new Set(blank);
 }
 
 const wrongSuit = (suit) => SUITS.find((s) => s !== suit);
@@ -32,7 +37,7 @@ const wrongSuit = (suit) => SUITS.find((s) => s !== suit);
 /** Everyone locks in the next player in seat order, so nobody is chosen twice. */
 function chooseAll(game) {
   if (game.phase === 'cooldown') game.advance(); // turns after the first open with a countdown
-  const ids = game.activePlayers.map((p) => p.id);
+  const ids = game.seatedPlayers.map((p) => p.id); // not whoever is in interrogation
   ids.forEach((id, i) => game.choose(id, [ids[(i + 1) % ids.length]]));
 }
 
@@ -757,4 +762,237 @@ test('the host decides whether the end reveals the blackout; off, nobody ever le
     assert.equal(view.result.blackout, null, `${p.name}'s phone never learns the Jack used it`);
     if (p.id !== host.id) assert.ok(!JSON.stringify(view).includes('blackout":{'), p.name);
   }
+});
+
+// ---- The Jack's limits, his fake, the interrogation vote, 10-word messages ----
+
+const notJack = (game) => game.activePlayers.filter((p) => p.id !== game.jackId);
+const colourOf = (suit) => (suit === 'hearts' || suit === 'diamonds' ? 'red' : 'black');
+
+test('the Jack’s limits and the interrogation are settings everyone sees, clamped, host-only', () => {
+  const { game, players, host } = setup(5);
+  const seen = game.viewFor(players[1].id).settings;
+  assert.deepEqual(
+    [seen.blankTurns, seen.colorTurns, seen.fakeSuits, seen.interrogation],
+    [1, 2, 2, true],
+    'on by default, and everyone knows how many',
+  );
+  assert.throws(() => game.updateSettings(players[1].id, { colorTurns: 1 }), { code: 'NOT_HOST' });
+  assert.throws(() => game.updateSettings(host.id, { interrogation: 'yes' }), { code: 'BAD_SETTINGS' });
+  game.updateSettings(host.id, { colorTurns: 99, blankTurns: -3, fakeSuits: 0, interrogation: false });
+  assert.deepEqual(
+    [game.settings.colorTurns, game.settings.blankTurns, game.settings.fakeSuits, game.settings.interrogation],
+    [5, 0, 0, false],
+  );
+});
+
+test('colour and blank turns are different turns, never the last; colour turns come first when short', () => {
+  const { game, host } = setup(5);
+  game.updateSettings(host.id, { maxTurns: 5, colorTurns: 3, blankTurns: 3 });
+  game.start(host.id);
+  const all = [...game.colorTurnSet, ...game.blankTurnSet];
+  assert.equal(game.colorTurnSet.size, 3);
+  assert.equal(game.blankTurnSet.size, 1, 'only 4 turns can hold them');
+  assert.equal(new Set(all).size, 4, 'no turn is both');
+  assert.ok(all.every((t) => t >= 1 && t < 5), 'never the last turn');
+});
+
+test('on a colour turn the Jack sees only red or black, and no real suit reaches his phone', () => {
+  const { game, host } = setup(6);
+  start(game, host, null, { color: [1] });
+  const jack = game.players.get(game.jackId);
+  chooseAll(game);
+  game.advance(); // lights
+  const lights = game.viewFor(jack.id).players.filter((p) => p.suit);
+  assert.equal(lights.length, 5);
+  for (const p of lights) assert.equal(p.suit, colourOf(game.players.get(p.id).suit));
+  assert.equal(game.viewFor(jack.id).you.powers.sight, 'color');
+  for (const p of notJack(game)) {
+    const view = game.viewFor(p.id);
+    assert.ok(view.players.filter((q) => q.suit).every((q) => SUITS.includes(q.suit)), 'the others see real suits');
+    assert.equal('powers' in view.you, false, 'and never hear about his powers');
+  }
+  game.advance(); // talk
+  const view = game.viewFor(jack.id);
+  const held = view.players.filter((p) => p.suit);
+  assert.equal(held.length, 2);
+  assert.ok(held.every((p) => p.suit === 'red' || p.suit === 'black'));
+  assert.ok(!SUITS.some((s) => JSON.stringify(view).includes(`"${s}"`)), 'no real suit in his state');
+});
+
+test('on a blank turn one of the 2 cards the Jack holds is blank, in the lights and the talk', () => {
+  const { game, host } = setup(6);
+  start(game, host, null, { blank: [1] });
+  const jack = game.players.get(game.jackId);
+  chooseAll(game);
+  game.advance(); // lights
+  const blank = game.viewFor(jack.id).players.filter((p) => p.suit === 'blank');
+  assert.equal(blank.length, 1);
+  assert.ok(game.sees.get(jack.id).includes(blank[0].id), 'it is one of the cards he holds');
+  assert.equal(game.viewFor(jack.id).you.powers.sight, 'blank');
+  game.advance(); // talk
+  const held = game.viewFor(jack.id).players.filter((p) => p.suit);
+  assert.deepEqual(held.map((p) => p.suit === 'blank').sort(), [false, true], 'one blank, one real');
+});
+
+test('the fake: while choosing, the Jack makes one holder of a card see a false suit on it', () => {
+  const { game, host } = setup(6);
+  start(game, host);
+  const jack = game.players.get(game.jackId);
+  const [other, target] = notJack(game);
+  assert.throws(() => game.fakeCard(other.id, target.id), { code: 'NOT_ALLOWED' });
+  assert.throws(() => game.fakeCard(jack.id, jack.id), { code: 'BAD_TARGET' });
+  game.fakeCard(jack.id, target.id);
+  assert.throws(() => game.fakeCard(jack.id, other.id), { code: 'FAKE_USED' });
+  assert.equal(game.viewFor(jack.id).you.powers.fakesLeft, 1);
+  assert.equal(game.viewFor(jack.id).you.powers.fakeTarget, target.id);
+  chooseAll(game);
+  game.advance(); // lights
+
+  const { fake } = game.viewFor(jack.id).you.powers;
+  const entry = game.viewers.get(target.id);
+  assert.equal(fake.targetId, target.id);
+  assert.ok([entry.picked, entry.random].includes(fake.viewerId), 'the faked player really holds that card');
+  assert.notEqual(fake.viewerId, jack.id);
+  assert.notEqual(fake.suit, target.suit, 'a false suit');
+  const seenBy = (id) => game.viewFor(id).players.find((p) => p.id === target.id).suit;
+  assert.equal(seenBy(fake.viewerId), fake.suit, 'they see the false suit in the lights');
+  for (const p of notJack(game)) {
+    if (p.id !== fake.viewerId && p.id !== target.id) assert.equal(seenBy(p.id), target.suit, `${p.name} sees the real one`);
+  }
+  game.advance(); // talk
+  assert.equal(seenBy(fake.viewerId), fake.suit, 'and in the talk');
+  assert.equal('powers' in game.viewFor(fake.viewerId).you, false);
+});
+
+test('no fakes on the Jack’s colour or blank turns, outside choosing, or once they run out', () => {
+  const { game, host } = setup(6);
+  game.updateSettings(host.id, { fakeSuits: 1 });
+  start(game, host, null, { color: [2] });
+  const jack = game.players.get(game.jackId);
+  const [target] = notJack(game);
+  game.fakeCard(jack.id, target.id); // turn 1
+  playTurn(game);
+  game.advance(); // turn 2, countdown
+  assert.throws(() => game.fakeCard(jack.id, target.id), { code: 'WRONG_PHASE' });
+  game.advance(); // choose, on his colour turn
+  assert.throws(() => game.fakeCard(jack.id, target.id), { code: 'FAKE_LOCKED' });
+  playTurn(game);
+  game.advance();
+  game.advance(); // turn 3, choose
+  assert.throws(() => game.fakeCard(jack.id, target.id), { code: 'NO_FAKES' });
+
+  const off = setup(5);
+  off.game.updateSettings(off.host.id, { fakeSuits: 0 });
+  start(off.game, off.host);
+  assert.throws(() => off.game.fakeCard(off.game.jackId, notJack(off.game)[0].id), { code: 'NOT_ALLOWED' });
+});
+
+test('a fake that lands on no other holder does nothing and is given back', () => {
+  const { game, host } = setup(6);
+  start(game, host);
+  const jack = game.players.get(game.jackId);
+  const [target] = notJack(game);
+  game.fakeCard(jack.id, target.id);
+  game.leave(target.id); // nobody holds the card of someone who left
+  chooseAll(game);
+  game.advance(); // lights
+  const { fake, fakesLeft } = game.viewFor(jack.id).you.powers;
+  assert.deepEqual(fake, { targetId: target.id, viewerId: null, suit: null });
+  assert.equal(fakesLeft, 2);
+});
+
+test('the interrogation vote opens after a quiet first half, or 2 turns before the end', () => {
+  const openTurns = (killOnTurn2) => {
+    const { game, host } = setup(6); // 8 turns
+    start(game, host);
+    const victim = notJack(game)[0];
+    const open = [];
+    playTurn(game);
+    for (let turn = 2; turn <= 6; turn++) {
+      game.advance(); // countdown
+      if (game.interrogationOpen) open.push(turn);
+      playTurn(game, (p) => (killOnTurn2 && turn === 2 && p.id === victim.id ? wrongSuit(p.suit) : p.suit));
+    }
+    return open;
+  };
+  assert.deepEqual(openTurns(false), [5, 6], 'nobody died in turns 1–4: open from turn 5');
+  assert.deepEqual(openTurns(true), [6], 'a death in the first half: only from turn 6 (8 − 2)');
+});
+
+test('the interrogation vote needs more than 4 players, and can be switched off', () => {
+  const small = setup(5);
+  small.game.updateSettings(small.host.id, { maxTurns: 4 });
+  start(small.game, small.host);
+  const victim = notJack(small.game)[0];
+  playTurn(small.game, (p) => (p.id === victim.id ? wrongSuit(p.suit) : p.suit));
+  small.game.advance(); // turn 2 of 4: the vote's turn, but only 4 are left
+  assert.equal(small.game.interrogationOpen, false);
+
+  const off = setup(6);
+  off.game.updateSettings(off.host.id, { maxTurns: 4, interrogation: false });
+  start(off.game, off.host);
+  playTurn(off.game);
+  off.game.advance();
+  assert.equal(off.game.interrogationOpen, false);
+  assert.equal(off.game.viewFor(off.host.id).interrogation, null);
+  assert.throws(() => off.game.vote(off.host.id, notJack(off.game)[0].id), { code: 'VOTE_CLOSED' });
+});
+
+test('a majority sends one player into interrogation: unseen, seeing nothing, no lifeline, once a game', () => {
+  const { game, host } = setup(6);
+  game.updateSettings(host.id, { maxTurns: 4 });
+  start(game, host);
+  playTurn(game);
+  game.advance(); // turn 2 of 4, countdown: the vote is open
+  assert.ok(game.interrogationOpen);
+  const suspect = notJack(game)[0];
+  const voters = game.activePlayers.filter((p) => p.id !== suspect.id);
+  assert.throws(() => game.vote(suspect.id, suspect.id), { code: 'BAD_TARGET' });
+  for (const v of voters.slice(0, 3)) game.vote(v.id, suspect.id);
+  game.vote(voters[3].id, voters[0].id);
+  const poll = game.viewFor(voters[4].id).interrogation;
+  assert.equal(poll.needed, 4, 'more than half of 6');
+  assert.equal(poll.votes[suspect.id], 3, 'counts, never names');
+  assert.equal(poll.yourVote, null);
+  game.vote(voters[3].id, suspect.id); // changes their vote
+  game.vote(voters[4].id, suspect.id);
+  game.vote(voters[4].id, null); // and takes it back: still 4
+  assert.equal(game.viewFor(host.id).interrogation.votes[suspect.id], 4);
+
+  game.advance(); // choose
+  assert.equal(game.interrogated, suspect.id);
+  assert.equal(game.viewFor(suspect.id).you.interrogated, true);
+  assert.equal(game.viewFor(host.id).interrogation.playerId, suspect.id, 'everyone knows who');
+  assert.throws(() => game.choose(suspect.id, [voters[0].id]), { code: 'INTERROGATED' });
+  assert.throws(() => game.choose(voters[0].id, [suspect.id]), { code: 'BAD_TARGET' });
+  chooseAll(game);
+  assert.ok(game.everyoneChose, 'nobody waits for the one in interrogation');
+  game.advance(); // lights
+  assert.deepEqual(shownTo(game, suspect), [], 'they see no card');
+  for (const p of voters) assert.ok(!shownTo(game, p).includes(suspect.id), `${p.name} doesn't see theirs`);
+  assert.equal(game.viewers.has(suspect.id), false, 'and nobody holds it');
+  game.advance(); // talk
+  assert.deepEqual(game.viewFor(suspect.id).you.sees, []);
+  game.advance(); // cell
+  assert.throws(() => game.useLifeline(suspect.id), { code: 'INTERROGATED' });
+  for (const p of game.alivePlayers) game.answer(p.id, p.id === suspect.id ? wrongSuit(p.suit) : p.suit);
+  game.advance(); // reveal
+  assert.equal(suspect.alive, false);
+
+  game.advance(); // turn 3: once a game
+  assert.equal(game.interrogated, null);
+  assert.equal(game.interrogationOpen, false);
+  assert.equal(game.viewFor(host.id).interrogation.used, true);
+});
+
+test('a private message is at most 10 words; a suit symbol counts as one', () => {
+  const { game, host } = setup(5);
+  start(game, host);
+  const [a, b] = game.activePlayers;
+  assert.throws(
+    () => game.sendMessage(a.id, b.id, 'one two three four five six seven eight nine ten eleven'),
+    { code: 'TOO_MANY_WORDS' },
+  );
+  assert.equal(game.sendMessage(a.id, b.id, 'You have ♥ trust me').text, 'You have ♥ trust me');
 });

@@ -211,6 +211,10 @@ export function useGame() {
       return blackout ? { blackout: true } : { suit };
     },
     blackout: () => request('turn:blackout'),
+    // The Jack, while choosing: one holder of `target`'s card will see a false suit on it.
+    fake: (target) => request('turn:fake', { target }),
+    // The interrogation vote, during the countdown; null takes your vote back.
+    vote: (target) => request('turn:vote', { target }),
     skip: () => request('game:skip'),
     answer: (suit) => request('turn:answer', { suit }),
     sendMessage: async (to, text) => (await request('chat:send', { to, text })).message,

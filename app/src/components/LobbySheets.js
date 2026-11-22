@@ -53,10 +53,42 @@ const SETTINGS = [
   { key: 'discussionSeconds', label: 'Talk', values: [60, 120, 180, 300, 600], format: (s) => `${s / 60} min` },
   { key: 'answerSeconds', label: 'Cell', values: [15, 30, 60], format: (s) => `${s} s` },
   { key: 'maxTurns', label: 'Turns', values: [5, 8, 12, 20], format: (n) => `${n}` },
+  // The Jack's limits: everyone sees how many, only the Jack learns which turns.
+  {
+    key: 'colorTurns',
+    label: 'Jack’s colour turns',
+    summary: (n) => (n === 1 ? 'colour turn' : 'colour turns'),
+    hint: 'Turns where the Jack sees only red or black, not the suit.',
+    values: [0, 1, 2, 3],
+    format: (n) => `${n}`,
+  },
+  {
+    key: 'blankTurns',
+    label: 'Jack’s blank turns',
+    summary: (n) => (n === 1 ? 'blank turn' : 'blank turns'),
+    hint: 'Turns where one card the Jack holds is blank.',
+    values: [0, 1, 2],
+    format: (n) => `${n}`,
+  },
+  {
+    key: 'fakeSuits',
+    label: 'Jack’s fakes',
+    summary: (n) => (n === 1 ? 'fake' : 'fakes'),
+    hint: 'Times a game the Jack can make someone see a false suit on a card. 0 turns it off.',
+    values: [0, 1, 2, 3],
+    format: (n) => `${n}`,
+  },
 ];
 
 export function settingsSummary(settings) {
-  return SETTINGS.map(({ key, label, format }) => ({ label, value: format(settings[key]) }));
+  const rows = SETTINGS.filter(({ key }) => settings[key] !== undefined).map(({ key, label, summary, format }) => ({
+    label: typeof summary === 'function' ? summary(settings[key]) : label,
+    value: format(settings[key]),
+  }));
+  if (typeof settings.interrogation === 'boolean') {
+    rows.push({ label: 'interrogation', value: settings.interrogation ? 'With' : 'No' });
+  }
+  return rows;
 }
 
 /** A host-only switch: a label, a line saying what it does, and On / Off. */
@@ -90,9 +122,10 @@ export function SettingsSheet({ visible, onClose, state, game }) {
   const { error, run } = useAction();
   return (
     <Sheet visible={visible} onClose={onClose} title="Settings">
-      {SETTINGS.map(({ key, label, values, format }) => (
+      {SETTINGS.map(({ key, label, hint, values, format }) => (
         <View key={key} style={styles.setting}>
           <Text style={styles.settingLabel}>{label}</Text>
+          {hint ? <Text style={styles.settingHint}>{hint}</Text> : null}
           <View style={styles.chips}>
             {values.map((v) => {
               const on = state.settings[key] === v;
@@ -111,6 +144,12 @@ export function SettingsSheet({ visible, onClose, state, game }) {
           </View>
         </View>
       ))}
+      <OnOff
+        label="Interrogation vote"
+        hint="Once a game, the table can vote one player alone for a turn: nobody sees their card, no lifeline."
+        value={state.settings.interrogation !== false}
+        onChange={(v) => run(() => game.updateSettings({ interrogation: v }))}
+      />
       {/* Only the host's phone is told these switches exist (the server leaves them out for everyone else). */}
       {typeof state.settings.blackout === 'boolean' ? (
         <>
@@ -145,6 +184,21 @@ const STEPS = [
   { icon: 'jack', title: 'The Jack', line: 'One of you. When the Jack is out, everyone left wins.' },
   { icon: 'lifeline', title: 'Lifeline', line: 'In your cell, peek at your own card. Once a game, not on the last turn.' },
   { icon: 'safe', title: 'Safe turn', line: 'One secret turn with the collars off. Never the last.' },
+  {
+    icon: 'sight',
+    title: 'The Jack’s bad turns',
+    line: 'On some secret turns the Jack sees only red or black, or one card blank. He still has to answer, so a wrong suit is a clue.',
+  },
+  {
+    icon: 'fake',
+    title: 'The Jack’s fakes',
+    line: 'A few times a game he makes someone see a false suit on a card. The one who tells you may be honest and still wrong.',
+  },
+  {
+    icon: 'vote',
+    title: 'Interrogation',
+    line: 'Once a game, in the countdown, more than half of you can vote one player alone: nobody sees their card, no lifeline.',
+  },
 ];
 
 function StepIcon({ kind }) {
@@ -192,6 +246,26 @@ function StepIcon({ kind }) {
       return <JackCard size={24} tilt="0deg" />;
     case 'lifeline':
       return <Card size={22} suit="hearts" />;
+    case 'sight':
+      return (
+        <View style={styles.iconRow}>
+          <Card size={22} suit="red" />
+          <View style={{ marginLeft: -6 }}>
+            <Card size={22} suit="blank" />
+          </View>
+        </View>
+      );
+    case 'fake':
+      return (
+        <View style={styles.iconRow}>
+          <Card size={22} suit="hearts" />
+          <View style={{ marginLeft: -6 }}>
+            <Card size={22} suit="clubs" />
+          </View>
+        </View>
+      );
+    case 'vote':
+      return <Text style={[styles.iconGlyph, { color: color.paint, fontSize: 18 }]}>VOTE</Text>;
     default:
       return <Text style={[styles.iconGlyph, { color: color.paint, fontSize: 22 }]}>0</Text>;
   }
