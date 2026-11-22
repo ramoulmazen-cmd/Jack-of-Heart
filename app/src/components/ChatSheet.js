@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SUIT_IMAGES, TINT_OF } from '../suitImages';
-import { color, SUITS, suitInk, suitOnWall } from '../theme';
+import { color, SUITS, suitInk } from '../theme';
 import { useChatContext } from '../useChat';
 import { Avatar } from './Avatar';
 import { Sheet } from './Sheet';
@@ -51,26 +51,44 @@ function SuitGlyph({ suit, size, tint }) {
   );
 }
 
-/** A message's words, with every suit symbol drawn as an image. */
+/** A suit as a tiny playing card: white, with the suit in its real colour (red ♥♦, black ♠♣). */
+function SuitCard({ suit, size = 16 }) {
+  return (
+    <View style={[styles.suitCard, { width: size + 8, height: size + 10 }]}>
+      <SuitGlyph suit={suit} size={size} tint={suitInk(suit)} />
+    </View>
+  );
+}
+
+/**
+ * A word cut into its suits and its text, with very long text cut into short runs that can wrap:
+ * an unbroken 150-letter word would otherwise run off the side of the screen.
+ */
+const CHUNK = 18;
+const piecesOf = (word) =>
+  word
+    .split(SUIT_CHARS)
+    .filter(Boolean)
+    .flatMap((piece) => {
+      const chars = Array.from(piece);
+      if (SUIT_OF[piece] || chars.length <= CHUNK) return [piece];
+      const runs = [];
+      for (let i = 0; i < chars.length; i += CHUNK) runs.push(chars.slice(i, i + CHUNK).join(''));
+      return runs;
+    });
+
+/** A message's words, with every suit symbol drawn as a tiny card in its colour. */
 function MessageText({ text, mine }) {
   const words = text.split(/\s+/).filter(Boolean);
   return (
     <View style={styles.words} aria-label={plainSuits(text)}>
       {words.map((word, i) => (
         <View key={i} style={styles.word}>
-          {word
-            .split(SUIT_CHARS)
-            .filter(Boolean)
-            .map((piece, j) =>
+          {piecesOf(word).map((piece, j) =>
               SUIT_OF[piece] ? (
-                <SuitGlyph
-                  key={j}
-                  suit={SUIT_OF[piece]}
-                  size={18}
-                  tint={mine ? suitInk(SUIT_OF[piece]) : suitOnWall(SUIT_OF[piece])}
-                />
+                <SuitCard key={j} suit={SUIT_OF[piece]} />
               ) : (
-                <Text key={j} style={[styles.bubbleText, mine && styles.mineText]}>
+                <Text key={j} style={[styles.bubbleText, styles.longWord, mine && styles.mineText]}>
                   {piece}
                 </Text>
               ),
@@ -232,7 +250,7 @@ function Composer({ chat, other }) {
             onPress={() => add(SYMBOL_OF[suit])}
             style={({ pressed }) => [styles.suit, pressed && styles.pressed]}
           >
-            <SuitGlyph suit={suit} size={22} tint={suitOnWall(suit)} />
+            <SuitGlyph suit={suit} size={20} tint={suitInk(suit)} />
           </Pressable>
         ))}
         <Text style={[styles.count, tooLong && styles.countOver]} aria-live="polite">
@@ -317,8 +335,19 @@ const styles = StyleSheet.create({
   theirs: { alignSelf: 'flex-start', backgroundColor: color.wall, borderWidth: 1, borderColor: color.wallLine, borderBottomLeftRadius: 5 },
   bubbleText: { color: color.chalk, fontSize: 16, lineHeight: 22 },
   mineText: { color: color.ink },
-  words: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 5 },
-  word: { flexDirection: 'row', alignItems: 'center' },
+  words: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 5, rowGap: 2 },
+  // A word longer than the bubble breaks onto the next line instead of running off the screen.
+  word: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', flexShrink: 1, maxWidth: '100%' },
+  longWord: { flexShrink: 1 },
+  suitCard: {
+    backgroundColor: color.stock,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 1,
+  },
 
   phrases: { gap: 6, paddingBottom: 8 },
   phrase: {
@@ -334,8 +363,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 36,
     borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: color.wallLine,
+    backgroundColor: color.stock,
     alignItems: 'center',
     justifyContent: 'center',
   },
