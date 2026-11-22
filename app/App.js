@@ -5,6 +5,7 @@ import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Root from './src/Root';
 import { color, font } from './src/theme';
+import { SuitPreload } from './src/ui';
 
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({ [font.stencil]: BigShouldersStencil_800ExtraBold });
@@ -13,6 +14,7 @@ export default function App() {
     <SafeAreaProvider style={styles.app}>
       <StatusBar style="light" />
       {fontsLoaded || fontError ? <Root /> : null}
+      <SuitPreload />
     </SafeAreaProvider>
   );
 }

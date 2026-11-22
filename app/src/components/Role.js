@@ -44,8 +44,6 @@ const CAPTIONS = {
 };
 const INNOCENT_EXTRA = 'A wrong suit can be a lie, a fake, or the Jack seeing badly.';
 
-const SUIT_NAME = { spades: 'spades', hearts: 'hearts', diamonds: 'diamonds', clubs: 'clubs' };
-
 /** The Jack's third line: this turn's sight, his fake, and how many fakes are left. */
 function powersLine(state, powers) {
   if (!powers) return '';
@@ -54,7 +52,8 @@ function powersLine(state, powers) {
   if (powers.sight === 'color') parts.push('This turn you see only red or black.');
   if (powers.sight === 'blank') parts.push('This turn one card you hold is blank.');
   if (powers.fake?.viewerId) {
-    parts.push(`Your fake: ${name(powers.fake.viewerId)} sees ${name(powers.fake.targetId)}’s card as ${SUIT_NAME[powers.fake.suit]}.`);
+    // Whose card, and who gets the false suit; never which suit (the server doesn't send it).
+    parts.push(`You faked ${name(powers.fake.targetId)}’s card: ${name(powers.fake.viewerId)} gets a false suit.`);
   } else if (powers.fake) {
     parts.push('Your fake found nobody to fool, so you got it back.');
   } else if (powers.fakeTarget) {

@@ -85,7 +85,8 @@ function screenFor(state, game, notes) {
 // talk needs no word of its own.
 const INTRO_WORDS = {
   choose: (turn) => `Turn ${turn}`,
-  briefing: () => 'Talk',
+  briefing: () => 'Plotting',
+  discussion: () => 'Talk',
   confinement: () => 'Your cell',
 };
 const INTRO_MS = 1100;

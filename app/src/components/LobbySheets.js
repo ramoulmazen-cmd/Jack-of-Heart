@@ -1,7 +1,7 @@
 import { Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { color, font } from '../theme';
-import { Button, Card, JackCard, useAction } from '../ui';
-import { Avatar } from './Avatar';
+import { Button, useAction } from '../ui';
+import { HowToPlaySheet } from './HowToPlay';
 import { JoinQR } from './JoinQR';
 import { Sheet } from './Sheet';
 
@@ -50,6 +50,13 @@ export function InviteSheet({ visible, onClose, state }) {
 }
 
 const SETTINGS = [
+  {
+    key: 'briefingSeconds',
+    label: 'Plotting',
+    hint: 'After the lights, before the talk: everyone knows who holds whose card, but nobody can look at one.',
+    values: [15, 30, 45, 60, 90],
+    format: (s) => `${s} s`,
+  },
   { key: 'discussionSeconds', label: 'Talk', values: [60, 120, 180, 300, 600], format: (s) => `${s / 60} min` },
   { key: 'answerSeconds', label: 'Cell', values: [15, 30, 60], format: (s) => `${s} s` },
   { key: 'maxTurns', label: 'Turns', values: [5, 8, 12, 20], format: (n) => `${n}` },
@@ -183,124 +190,14 @@ export function SettingsSheet({ visible, onClose, state, game }) {
   );
 }
 
-const STEPS = [
-  { icon: 'choose', title: 'Choose', line: 'Rank who sees your card. The 2 fastest get each person, or just the fastest with 4 or fewer.' },
-  { icon: 'lights', title: 'Lights', line: 'See every card but yours for a few seconds.' },
-  {
-    icon: 'cooldown',
-    title: '45 seconds',
-    line: 'You learn who holds your card and whose cards you hold, but can’t look at any card yet. Make deals.',
-  },
-  { icon: 'talk', title: 'Talk', line: 'Keep 2 cards, or 1 with 4 or fewer. Tell the truth, or lie.' },
-  { icon: 'chat', title: 'Private chat', line: 'Message any living player, only they see it. Any time but in your cell.' },
-  { icon: 'cell', title: 'Cell', line: 'Name your own suit. Wrong means out.' },
-  { icon: 'jack', title: 'The Jack', line: 'One of you. When the Jack is out, everyone left wins.' },
-  { icon: 'lifeline', title: 'Lifeline', line: 'In your cell, peek at your own card. Once a game, not on the last turn.' },
-  { icon: 'safe', title: 'Safe turn', line: 'One secret turn with the collars off, never the last. The host can switch it off.' },
-  {
-    icon: 'sight',
-    title: 'The Jack’s bad turns',
-    line: 'On some secret turns the Jack sees only red or black, or one card blank. He still has to answer, so a wrong suit is a clue.',
-  },
-  {
-    icon: 'fake',
-    title: 'The Jack’s fakes',
-    line: 'A few times a game he makes someone see a false suit on a card. The one who tells you may be honest and still wrong.',
-  },
-  {
-    icon: 'vote',
-    title: 'Interrogation',
-    line: 'Once a game, in the 45 seconds, more than half of you can vote one player alone: their card is swapped for one nobody has seen, nobody holds it, no lifeline.',
-  },
-];
-
-function StepIcon({ kind }) {
-  switch (kind) {
-    case 'choose':
-      return (
-        <View style={styles.iconRow}>
-          {['A', 'B', 'C'].map((n, i) => (
-            <Avatar key={n} player={{ name: n }} size={22} style={{ marginLeft: i ? -7 : 0 }} />
-          ))}
-        </View>
-      );
-    case 'lights':
-      return (
-        <View style={styles.iconRow}>
-          {['spades', 'hearts', 'clubs'].map((s, i) => (
-            <View key={s} style={{ marginLeft: i ? -8 : 0, transform: [{ rotate: `${(i - 1) * 10}deg` }] }}>
-              <Card size={20} suit={s} />
-            </View>
-          ))}
-        </View>
-      );
-    case 'talk':
-      return (
-        <View style={styles.iconRow}>
-          <Card size={22} back />
-          <View style={{ marginLeft: -6 }}>
-            <Card size={22} back />
-          </View>
-        </View>
-      );
-    case 'cell':
-      return <Text style={styles.iconGlyph}>?</Text>;
-    case 'cooldown':
-      return <Text style={[styles.iconGlyph, { color: color.paint, fontSize: 26 }]}>0:45</Text>;
-    case 'chat':
-      return (
-        <View style={styles.bubbleIcon}>
-          {[0, 1, 2].map((i) => (
-            <View key={i} style={styles.bubbleDot} />
-          ))}
-        </View>
-      );
-    case 'jack':
-      return <JackCard size={24} tilt="0deg" />;
-    case 'lifeline':
-      return <Card size={22} suit="hearts" />;
-    case 'sight':
-      return (
-        <View style={styles.iconRow}>
-          <Card size={22} suit="red" />
-          <View style={{ marginLeft: -6 }}>
-            <Card size={22} suit="blank" />
-          </View>
-        </View>
-      );
-    case 'fake':
-      return (
-        <View style={styles.iconRow}>
-          <Card size={22} suit="hearts" />
-          <View style={{ marginLeft: -6 }}>
-            <Card size={22} suit="clubs" />
-          </View>
-        </View>
-      );
-    case 'vote':
-      return <Text style={[styles.iconGlyph, { color: color.paint, fontSize: 18 }]}>VOTE</Text>;
-    default:
-      return <Text style={[styles.iconGlyph, { color: color.paint, fontSize: 22 }]}>0</Text>;
-  }
-}
-
-export function RulesSheet({ visible, onClose }) {
-  return (
-    <Sheet visible={visible} onClose={onClose} title="How to play">
-      {STEPS.map((step) => (
-        <View key={step.title} style={styles.step}>
-          <View style={styles.icon}>
-            <StepIcon kind={step.icon} />
-          </View>
-          <View style={styles.stepText}>
-            <Text style={styles.stepTitle}>{step.title}</Text>
-            <Text style={styles.stepLine}>{step.line}</Text>
-          </View>
-        </View>
-      ))}
-      <Text style={styles.house}>Never show your screen. No talking in the cell. The dead stay silent.</Text>
-    </Sheet>
-  );
+/**
+ * How to play: the slides (HowToPlay.js), with this room's times and counts. The lobby and the
+ * in-game menu both open it. The blackout slide is only for phones the server tells about the
+ * power: the host's (its switch, when on) and the Jack's (his blackout status).
+ */
+export function RulesSheet({ visible, onClose, state }) {
+  const secret = state.settings?.blackout === true || (state.you != null && 'blackout' in state.you);
+  return <HowToPlaySheet visible={visible} onClose={onClose} settings={state.settings} secret={secret} />;
 }
 
 const styles = StyleSheet.create({
@@ -326,22 +223,4 @@ const styles = StyleSheet.create({
   chipText: { color: color.chalk, fontSize: 16, fontWeight: '700' },
   chipTextOn: { color: color.ink },
   pressed: { opacity: 0.8, transform: [{ scale: 0.96 }] },
-  step: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 9 },
-  icon: { width: 54, height: 40, alignItems: 'center', justifyContent: 'center' },
-  iconRow: { flexDirection: 'row', alignItems: 'center' },
-  iconGlyph: { fontFamily: font.stencil, color: color.chalk, fontSize: 30, lineHeight: 34 },
-  bubbleIcon: {
-    flexDirection: 'row',
-    gap: 3,
-    paddingHorizontal: 8,
-    paddingVertical: 7,
-    borderRadius: 12,
-    borderBottomLeftRadius: 3,
-    backgroundColor: color.paint,
-  },
-  bubbleDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: color.ink },
-  stepText: { flex: 1 },
-  stepTitle: { color: color.chalk, fontSize: 17, fontWeight: '800' },
-  stepLine: { color: color.faded, fontSize: 15, lineHeight: 20 },
-  house: { color: color.alarm, fontSize: 14, lineHeight: 20, marginTop: 10, textAlign: 'center' },
 });

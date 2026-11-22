@@ -280,7 +280,7 @@ export function createGameServer({ timeScale = 1, webDir, lanAddresses = () => [
       sendTo(room, playerId);
     });
 
-    // The interrogation vote, during the countdown. Everyone sees the counts move.
+    // The interrogation vote, during Plotting (the briefing). Everyone sees the counts move.
     handle('turn:vote', ({ target }) => {
       const { room, game, playerId } = current();
       game.vote(playerId, target ?? null);

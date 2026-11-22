@@ -52,7 +52,7 @@ export function RoomMenu({ state, game, visible, onClose }) {
         ) : null}
         <ErrorText>{error}</ErrorText>
       </Sheet>
-      <RulesSheet visible={visible && rules} onClose={() => setRules(false)} />
+      <RulesSheet visible={visible && rules} onClose={() => setRules(false)} state={state} />
     </>
   );
 }

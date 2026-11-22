@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { AlsoSeenBy } from '../components/AlsoSeenBy';
 import { Avatar } from '../components/Avatar';
 import { HoldButton } from '../components/HoldButton';
 import { RoleOverlay } from '../components/Role';
@@ -47,7 +48,7 @@ export default function BriefingScreen({ state, game }) {
 
   return (
     <Screen footer={footer} overlay={showRole ? <RoleOverlay state={state} /> : null}>
-      <TopBar state={state} game={game} title="Talk" clock={false} />
+      <TopBar state={state} game={game} title="Plotting" clock={false} />
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         <View style={styles.clockBlock} aria-label={`Your cards come in ${left} seconds`}>
           <Text style={styles.until}>Your cards in</Text>
@@ -70,11 +71,7 @@ export default function BriefingScreen({ state, game }) {
                     {p.name}
                   </Text>
                 </View>
-                {other ? (
-                  <Text style={styles.with} numberOfLines={1}>
-                    with {other.name}
-                  </Text>
-                ) : null}
+                {other ? <AlsoSeenBy player={other} width={140} /> : null}
               </View>
             );
           })}
@@ -160,7 +157,6 @@ const styles = StyleSheet.create({
   cardTile: { alignItems: 'center', maxWidth: 140 },
   owner: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6, maxWidth: 140 },
   ownerName: { color: color.chalk, fontSize: 15, fontWeight: '800', flexShrink: 1 },
-  with: { color: color.faded, fontSize: 12, marginTop: 2 },
   holders: { gap: 8 },
   holder: {
     flexDirection: 'row',

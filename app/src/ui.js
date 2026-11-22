@@ -27,6 +27,23 @@ const JACK = require('../assets/jack-card.png');
 const JACK_HEART = require('../assets/jack-heart.png');
 
 /**
+ * Every suit picture a card face uses, drawn once, invisibly, as the app opens. Without it the
+ * first card you turned over showed an empty face for a moment while its picture loaded; now the
+ * pictures are ready (and react-native-web remembers they are), so every flip shows the suit at once.
+ */
+export function SuitPreload() {
+  return (
+    <View pointerEvents="none" aria-hidden style={styles.preload}>
+      {SUITS.flatMap((suit) =>
+        ['red', 'ink', 'chalk', 'alarm'].map((tint) => (
+          <Image key={`${suit}-${tint}`} source={SUIT_IMAGES[suit][tint]} style={styles.preloadImage} accessible={false} />
+        )),
+      )}
+    </View>
+  );
+}
+
+/**
  * A suit as an image, in one of the theme's colours. Never as a text character: many Android
  * phones only have ♠♥♦♣ in their emoji font, and when asked for plain text they draw nothing.
  */
@@ -443,6 +460,9 @@ export const text = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
+  // Painted (so the browser decodes the pictures) but invisible: 1 pixel at 1% opacity.
+  preload: { position: 'absolute', top: 0, left: 0, width: 1, height: 1, opacity: 0.01, overflow: 'hidden' },
+  preloadImage: { position: 'absolute', top: 0, left: 0, width: 1, height: 1 },
   screen: { flex: 1, overflow: 'hidden' },
   column: { flex: 1, width: '100%', maxWidth: MAX_WIDTH, alignSelf: 'center' },
   fill: { flex: 1 },

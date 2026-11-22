@@ -82,7 +82,7 @@ export default function LobbyScreen({ state, game }) {
       </View>
 
       <InviteSheet visible={sheet === 'invite'} onClose={close} state={state} />
-      <RulesSheet visible={sheet === 'rules'} onClose={close} />
+      <RulesSheet visible={sheet === 'rules'} onClose={close} state={state} />
       <SettingsSheet visible={sheet === 'settings'} onClose={close} state={state} game={game} />
       <PhotoSheet
         visible={sheet === 'photo'}

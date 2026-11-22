@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { AlsoSeenBy } from '../components/AlsoSeenBy';
 import { Avatar, PlayerStrip } from '../components/Avatar';
 import { FlipCard } from '../components/FlipCard';
 import { HoldArea } from '../components/HoldArea';
@@ -88,15 +89,7 @@ export default function DiscussionScreen({ state, game, notes }) {
                   {p.name}
                 </Text>
               </View>
-              {other ? (
-                <View style={styles.with}>
-                  <Text style={styles.withText}>also seen by</Text>
-                  <Avatar player={other} size={16} />
-                  <Text style={styles.withName} numberOfLines={1}>
-                    {other.name}
-                  </Text>
-                </View>
-              ) : null}
+              {other ? <AlsoSeenBy player={other} /> : null}
             </HoldArea>
           );
         })}
@@ -117,9 +110,6 @@ const styles = StyleSheet.create({
   cardTile: { alignItems: 'center', maxWidth: 150 },
   owner: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, maxWidth: 150 },
   ownerName: { color: color.chalk, fontSize: 15, fontWeight: '800', flexShrink: 1 },
-  with: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3, maxWidth: 150 },
-  withText: { color: color.faded, fontSize: 12 },
-  withName: { color: color.faded, fontSize: 12, fontWeight: '700', flexShrink: 1 },
   hint: { color: color.paint, fontSize: 13, fontWeight: '700', textAlign: 'center', marginTop: 8 },
   bar: { flexDirection: 'row', gap: 8 },
   barButton: {

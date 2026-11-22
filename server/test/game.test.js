@@ -868,9 +868,11 @@ test('the fake: while choosing, the Jack makes one holder of a card see a false 
   assert.equal(fake.targetId, target.id);
   assert.ok([entry.picked, entry.random].includes(fake.viewerId), 'the faked player really holds that card');
   assert.notEqual(fake.viewerId, jack.id);
-  assert.notEqual(fake.suit, target.suit, 'a false suit');
+  assert.equal('suit' in fake, false, 'the Jack is never told which false suit');
+  const falseSuit = game.fake.suit;
+  assert.notEqual(falseSuit, target.suit, 'a false suit');
   const seenBy = (id) => game.viewFor(id).players.find((p) => p.id === target.id).suit;
-  assert.equal(seenBy(fake.viewerId), fake.suit, 'they see the false suit in the lights');
+  assert.equal(seenBy(fake.viewerId), falseSuit, 'they see the false suit in the lights');
   for (const p of notJack(game)) {
     if (p.id !== fake.viewerId && p.id !== target.id) assert.equal(seenBy(p.id), target.suit, `${p.name} sees the real one`);
   }
@@ -878,7 +880,8 @@ test('the fake: while choosing, the Jack makes one holder of a card see a false 
   assert.equal(seenBy(fake.viewerId), null, 'no card is on screen in the briefing');
   assert.deepEqual(game.viewFor(jack.id).you.powers.fake, fake, 'the Jack still knows what his fake did');
   toTalk(game);
-  assert.equal(seenBy(fake.viewerId), fake.suit, 'and in the talk');
+  assert.equal(seenBy(fake.viewerId), falseSuit, 'and in the talk');
+  assert.ok(!JSON.stringify(game.viewFor(jack.id).you.powers).includes(falseSuit), 'not even hidden in his state');
   assert.equal('powers' in game.viewFor(fake.viewerId).you, false);
 });
 
@@ -913,7 +916,7 @@ test('a fake that lands on no other holder does nothing and is given back', () =
   game.leave(target.id); // nobody holds the card of someone who left
   toBriefing(game);
   const { fake, fakesLeft } = game.viewFor(jack.id).you.powers;
-  assert.deepEqual(fake, { targetId: target.id, viewerId: null, suit: null });
+  assert.deepEqual(fake, { targetId: target.id, viewerId: null });
   assert.equal(fakesLeft, 2);
 });
 
@@ -1030,6 +1033,22 @@ test('interrogation swaps the card everyone glimpsed in the lights for one nobod
   assert.ok(changed > 0, 'the card is dealt again');
 });
 
+test('plotting (the time before the talk) is a host setting everyone sees: 45 s, from 10 to 180', () => {
+  const { game, players, host } = setup(5);
+  assert.equal(game.viewFor(players[1].id).settings.briefingSeconds, 45, '45 seconds by default, and everyone knows');
+  assert.throws(() => game.updateSettings(players[1].id, { briefingSeconds: 90 }), { code: 'NOT_HOST' });
+  assert.throws(() => game.updateSettings(host.id, { briefingSeconds: 'long' }), { code: 'BAD_SETTINGS' });
+  game.updateSettings(host.id, { briefingSeconds: 5 });
+  assert.equal(game.settings.briefingSeconds, 10, 'never shorter than 10 seconds');
+  game.updateSettings(host.id, { briefingSeconds: 999 });
+  assert.equal(game.settings.briefingSeconds, 180, 'never longer than 3 minutes');
+  game.updateSettings(host.id, { briefingSeconds: 90 });
+  start(game, host);
+  toBriefing(game);
+  assert.equal(game.phaseEndsAt - game.viewFor(host.id).serverNow, 90_000, 'the plotting lasts what the host set');
+  assert.throws(() => game.updateSettings(host.id, { briefingSeconds: 30 }), { code: 'WRONG_PHASE' }, 'not mid-game');
+});
+
 test('the safe turn is a switch everyone can see; off, every turn is deadly', () => {
   const { game, players, host } = setup(5);
   assert.equal(game.viewFor(players[1].id).settings.safeTurn, true, 'on by default, and everyone knows');
@@ -1070,7 +1089,7 @@ test('a fake whose fooled holder goes into interrogation does nothing and is giv
   game.advance(); // the talk: the holder is alone
   assert.equal(game.interrogated, holder.id);
   const after = game.viewFor(jack.id).you.powers;
-  assert.deepEqual(after.fake, { targetId: target.id, viewerId: null, suit: null });
+  assert.deepEqual(after.fake, { targetId: target.id, viewerId: null });
   assert.equal(after.fakesLeft, 2, 'given back');
   assert.ok(game.viewFor(holder.id).players.every((p) => p.suit === null), 'and they see nothing anyway');
 });

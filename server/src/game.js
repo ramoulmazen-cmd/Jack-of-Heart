@@ -21,9 +21,9 @@ export const RANKING_FROM = 5;
 export const MAX_CHOICES = 3;
 export const REVEAL_SECONDS = 8;
 /**
- * The briefing: right after the lights, before the talk. Everyone has glimpsed every card but their
- * own, and now learns who holds their card and whose cards they hold, but can't look at any card.
- * Time to argue, make deals, and vote.
+ * Plotting (the `briefing` phase): right after the lights, before the talk. Everyone has glimpsed
+ * every card but their own, and now learns who holds their card and whose cards they hold, but
+ * can't look at any card. Time to argue, make deals, and vote. 45 seconds unless the host changes it.
  */
 export const BRIEFING_SECONDS = 45;
 
@@ -35,11 +35,11 @@ export const CHAT_HISTORY = 100;
 export const CHAT_BURST = 5;
 export const CHAT_BURST_MS = 5000;
 
-// The phases after viewers have been assigned.
-// The phases after viewers have been assigned: you know who holds whose card from the briefing on.
+// The phases after viewers have been assigned: from the lights on, you know who holds whose card.
 const VISION_PHASES = ['briefing', 'lights', 'discussion', 'confinement'];
 
 export const SETTING_LIMITS = {
+  briefingSeconds: { min: 10, max: 180, default: BRIEFING_SECONDS }, // plotting, before the talk
   discussionSeconds: { min: 30, max: 3600, default: 180 },
   answerSeconds: { min: 10, max: 300, default: 30 },
   maxTurns: { min: 2, max: 50, default: 8 },
@@ -505,7 +505,7 @@ export class Game {
     if (this.phase === 'choose') {
       this.#dealVision();
     } else if (this.phase === 'lights') {
-      this.#enter('briefing', BRIEFING_SECONDS);
+      this.#enter('briefing', this.settings.briefingSeconds);
     } else if (this.phase === 'briefing') {
       this.#resolveVote();
       this.#enter('discussion', this.settings.discussionSeconds);
@@ -668,16 +668,18 @@ export class Game {
 
   /**
    * For the Jack only. `sight`: this turn's limit ('color', 'blank' or null). `fake`: once the cards
-   * are dealt, whose card he faked, who sees the false suit and which one; `viewerId` null means
-   * nobody else holds that card, so nothing happened and the fake was given back.
+   * are dealt, whose card he faked and who gets the false suit, but never which suit: he can't
+   * line his own story up with it. `viewerId` null means nobody else holds that card, so nothing
+   * happened and the fake was given back. (Game Over tells everyone what the fake showed.)
    */
   #jackPowers() {
     const playing = this.phase !== 'over';
+    const fake = VISION_PHASES.includes(this.phase) && this.fake ? this.fake : null;
     return {
       sight: playing ? this.jackSight : null,
       fakesLeft: this.settings.fakeSuits ? this.fakesLeft : 0,
       fakeTarget: playing ? this.fakeTarget : null,
-      fake: VISION_PHASES.includes(this.phase) && this.fake ? { ...this.fake } : null,
+      fake: fake ? { targetId: fake.targetId, viewerId: fake.viewerId } : null,
     };
   }
 
