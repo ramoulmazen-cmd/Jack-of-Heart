@@ -3,7 +3,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { viewersOf } from './ui';
 
 const NOTES_KEY = 'joh.notes';
-const VISION_PHASES = ['lights', 'discussion', 'confinement'];
+// From the briefing on, you know who holds your card.
+const VISION_PHASES = ['briefing', 'lights', 'discussion', 'confinement'];
 
 /**
  * Your private notebook for one game. For each round: what your two viewers told you your card
@@ -54,6 +55,8 @@ export function useNotes(state) {
   const turn = state?.turn;
   const viewers = state && VISION_PHASES.includes(phase) ? viewersOf(state).map(({ id, name, how }) => ({ id, name, how })) : [];
   const viewersKey = JSON.stringify(viewers);
+  // Sent into interrogation after the briefing: nobody holds your card any more, so forget who did.
+  const alone = Boolean(you?.interrogated) && VISION_PHASES.includes(phase);
   const ending =
     phase === 'reveal' && you
       ? {
@@ -67,12 +70,12 @@ export function useNotes(state) {
   useEffect(() => {
     if (!loaded) return;
     const snapshot = JSON.parse(viewersKey);
-    if (snapshot.length) {
-      update(turn, (round) => (JSON.stringify(round.viewers) === viewersKey ? null : { viewers: snapshot }));
+    if (snapshot.length || alone) {
+      update(turn, (round) => (JSON.stringify(round.viewers ?? []) === viewersKey ? null : { viewers: snapshot }));
     }
     const end = JSON.parse(endingKey);
     if (end) update(turn, (round) => (round.result === end.result && round.answer === end.answer ? null : end));
-  }, [loaded, turn, viewersKey, endingKey, update]);
+  }, [loaded, turn, viewersKey, alone, endingKey, update]);
 
   const round = (n) => (loaded ? book.rounds[n] ?? {} : {});
   return {

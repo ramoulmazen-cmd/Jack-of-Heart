@@ -108,12 +108,16 @@ test('a full game over real sockets: ranked choices, the glimpse, your 2 cards, 
   assert.equal((await choose(c3, [c1])).error, 'LOCKED');
   assert.equal((await choose(c4, [c4])).error, 'BAD_TARGET');
   assert.equal((await choose(c4, [c1])).ok, true);
-  assert.equal((await choose(host, [c2])).ok, true); // last lock-in: the lights come on
-  await Promise.all(everyone.map((c) => waitFor(c, (s) => s.phase === 'discussion' && s.turn === 1)));
+  assert.equal((await choose(host, [c2])).ok, true); // last lock-in: the briefing starts
+  await Promise.all(everyone.map((c) => waitFor(c, (s) => s.phase === 'discussion' && s.turn === 1, 10000)));
 
   for (const c of everyone) {
+    const briefing = stateOf(c, 'briefing', 1);
     const lights = stateOf(c, 'lights', 1);
     const talk = stateOf(c, 'discussion', 1);
+    assert.deepEqual(withCards(briefing), [], 'the briefing shows no suit');
+    assert.deepEqual([...briefing.you.sees].sort(), [...talk.you.sees].sort(), 'but whose cards you will hold');
+    assert.deepEqual(briefing.you.viewers, talk.you.viewers, 'and who holds yours');
     const othersIds = everyone.filter((o) => o !== c).map((o) => o.id).sort();
     assert.deepEqual(withCards(lights), othersIds, 'the lights show every card but yours');
     assert.deepEqual(withCards(talk), [...talk.you.sees].sort(), 'the talk keeps only your 2 cards');
@@ -150,11 +154,11 @@ test('a full game over real sockets: ranked choices, the glimpse, your 2 cards, 
   const reveal1 = await waitFor(host, (s) => s.phase === 'reveal' && s.turn === 1);
   assert.deepEqual(reveal1.deaths, []);
 
-  // Turn 2 opens with the countdown (45 s, here 2.25 s), then nobody chooses in time, so the
-  // server picks for everyone.
-  const countdown = await waitFor(host, (s) => s.phase === 'cooldown' && s.turn === 2);
-  assert.ok(Math.abs(countdown.phaseEndsAt - countdown.serverNow - 45 * 1000 * 0.05) < 100, 'a 45-second countdown');
-  assert.equal(stateOf(host, 'cooldown', 1), undefined, 'turn 1 has none');
+  // Turn 2 starts with choosing; nobody chooses in time, so the server picks for everyone. Then
+  // the 45-second briefing (here 2.25 s), every turn.
+  await waitFor(host, (s) => s.phase === 'choose' && s.turn === 2);
+  const briefing2 = await waitFor(host, (s) => s.phase === 'briefing' && s.turn === 2, 4000);
+  assert.ok(Math.abs(briefing2.phaseEndsAt - briefing2.serverNow - 45 * 1000 * 0.05) < 100, 'a 45-second briefing');
   await Promise.all(everyone.map((c) => waitFor(c, (s) => s.phase === 'discussion' && s.turn === 2, 10000)));
   const truth2 = truthFromLights(everyone, 2);
   assert.equal(truth2.size, everyone.length);
@@ -303,8 +307,8 @@ test('when the last player everyone is waiting for leaves, the turn goes on with
   await call(c, 'turn:choose', { ranking: [a.id] });
   const left = Date.now();
   await call(d, 'room:leave');
-  await waitFor(a, (s) => s.phase === 'lights', 2000);
-  assert.ok(Date.now() - left < 500, 'the lights came on right away, not when the choosing clock ran out');
+  await waitFor(a, (s) => s.phase === 'briefing', 2000);
+  assert.ok(Date.now() - left < 500, 'the briefing started right away, not when the choosing clock ran out');
 });
 
 test('mugshots: upload over the socket, everyone sees the new version, the image comes over HTTP', async () => {

@@ -14,7 +14,7 @@ export default function DeadScreen({ state, game }) {
         <Avatar player={state.players.find((p) => p.id === state.you.id)} size={140} out />
         <Text style={styles.title}>You’re out</Text>
         <Text style={styles.line}>Stay silent until the end.</Text>
-        {state.phase === 'cooldown' ? <NextTurn state={state} game={game} /> : null}
+        {state.phase === 'briefing' ? <LightsIn state={state} game={game} /> : null}
       </View>
       <Text style={styles.count}>
         <Text style={styles.countNumber}>{alive}</Text> still in
@@ -24,12 +24,12 @@ export default function DeadScreen({ state, game }) {
   );
 }
 
-/** The countdown before a turn is on every screen, the watchers' too. */
-function NextTurn({ state, game }) {
+/** The briefing's clock is on every screen, the watchers' too. */
+function LightsIn({ state, game }) {
   const left = useSecondsLeft(state.phaseEndsAt, game.clockOffset) ?? 0;
   return (
-    <View style={styles.next} aria-label={`Turn ${state.turn} starts in ${left} seconds`}>
-      <Text style={styles.nextText}>Turn {state.turn} starts in</Text>
+    <View style={styles.next} aria-label={`The lights come on in ${left} seconds`}>
+      <Text style={styles.nextText}>Turn {state.turn}: lights in</Text>
       <Text style={styles.nextClock}>{clockText(left)}</Text>
     </View>
   );

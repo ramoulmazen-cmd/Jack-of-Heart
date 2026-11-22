@@ -46,15 +46,15 @@ Recent Android versions don't let Termux read the phone's own network address. I
 
 ## How to play
 
-1. **Countdown (45 s, from turn 2).** Every turn after the first opens with a big clock on every phone. The cards are dealt but face down: tapping one just says the turn hasn't started yet and how long is left. It's time to argue about the last result. Turn 1 starts straight away, since there's nothing to doubt yet.
-2. **Choose (20 s).** Pick who sees your card: rank up to 3 people (just 1 with 4 or fewer players). Each person can be chosen by only 2 players, the 2 fastest. A second viewer is added at random. Every card is seen by exactly 2 people, and everyone holds exactly 2 cards.
+1. **Choose (20 s).** Every turn starts here. Pick who sees your card: rank up to 3 people (just 1 with 4 or fewer players). Each person can be chosen by only 2 players, the 2 fastest. A second viewer is added at random. Every card is seen by exactly 2 people, and everyone holds exactly 2 cards.
    **With 4 or fewer players it's 1 and 1:** each person goes to the fastest player who chose them, nobody is added at random, your card is seen by that one person only, and you hold 1 card.
-3. **Lights (5 s, or 3 s with 5 or fewer players).** Every card but yours shows on screen, with nothing to hold. Two of them (1 with 4 or fewer players) stay with you, but nothing marks which: you find out in the talk.
+2. **45 seconds before the lights.** The talk begins with a big clock on every phone. You now know who holds your card and whose cards you'll hold (and who holds them with you), but nobody sees a suit yet. Argue about the last result, make deals, set traps. If the interrogation vote is open, this is when it happens.
+3. **Lights (5 s, or 3 s with 5 or fewer players).** Every card but yours shows on screen, with nothing to hold.
 4. **Talk.** Hold one of your cards to look at it again; under each one you see who else holds it (with 4 or fewer players, nobody else does). Note what your viewers tell you. Trade, promise, lie.
 5. **Cell.** Your notes are on screen. Pick your own suit. Wrong, or no answer, and you're out. This is the only place your lifeline works, and it doesn't on the last turn.
 6. **Results.** ALIVE, DEAD or SAFE in the middle of the screen; everyone's mugshot shows who's still in.
 
-**Private chat.** Tap **Chat** at the top of the screen (on the countdown, choosing, the talk and the cell) to message any living player. Only the two of you ever see a conversation, and nobody else's phone is even told that you're talking. It's open the whole game except in your cell (you can still read there), and the dead can't write. The number on **Chat** counts the messages you haven't read. A message is at most **10 words**; tap a ready-made phrase ("Your card is", "I trust you", "You lied to me" …) or a suit button to add it.
+**Private chat.** Tap **Chat** at the top of the screen (while choosing, in the 45 seconds, the talk and the cell) to message any living player. Only the two of you ever see a conversation, and nobody else's phone is even told that you're talking. It's open the whole game except in your cell (you can still read there), and the dead can't write. The number on **Chat** counts the messages you haven't read. A message is at most **10 words**; tap a ready-made phrase ("Your card is", "I trust you", "You lied to me" …) or a suit button to add it.
 
 The moment the Jack is out, everyone still in wins. The Jack wins by surviving until one other player is left, or until the turns run out. Once per game, in your cell, you can peek at your own card (Lifeline), except on the last turn. One secret turn has the collars off; it's never the last turn. Cards are dealt fresh every turn: repeats and streaks are normal.
 
@@ -66,7 +66,7 @@ The moment the Jack is out, everyone still in wins. The Jack wins by surviving u
 
 Holding **Role** (while choosing or in the talk) tells the Jack this turn's sight and what his fake did.
 
-**Interrogation vote** (on by default). Once a game, during the countdown, more than half of the living players can vote one player into interrogation for that turn: nobody holds their card, it's hidden in the lights, they see no cards and can't use their lifeline, so they guess their suit alone. Tap a card in the countdown to vote; the counts show, never who voted. The vote opens right after the first half of the game if nobody died in it (8 turns: from turn 5), otherwise 2 turns before the end (8 turns: turn 6), and only with more than 4 players left.
+**Interrogation vote** (on by default). Once a game, in the 45 seconds before the lights, more than half of the living players can vote one player into interrogation for the rest of that turn: nobody holds their card any more, they hold nobody's (those cards keep their other holder), their card is hidden in the lights, and they can't use their lifeline, so they guess their suit alone. Since everyone already knows who holds whose card, you can vote out the one you don't trust with yours. Tap a name to vote; the counts show, never who voted. The vote opens right after the first half of the game if nobody died in it (8 turns: from turn 5), otherwise 2 turns before the end (8 turns: turn 6), and only with more than 4 players left.
 
 The host sets all of these in **Settings**: colour turns, blank turns, fakes (0 turns each one off) and the interrogation vote on or off.
 
@@ -99,7 +99,8 @@ Under it, **Reveal it at the end** decides what the Game Over screen says. On (t
 ## Version 6.0
 
 - **The Jack can't always see.** Colour turns (red or black only), a blank turn (one held card blank) and fakes (a holder sees a false suit). A Jack who never lies used to win almost every game; now he has to say something on turns he can't see, and his mistakes point at him.
-- **Interrogation vote.** Once a game, in the countdown, a majority can send one player into interrogation: no holders, no lifeline.
+- **The 45 seconds moved to after choosing.** Every turn, the first too, now goes: choose → 45 seconds where you know who holds your card and whose cards you hold, but see no suit → lights → talk → cell. The countdown at the start of each turn is gone.
+- **Interrogation vote.** Once a game, in those 45 seconds, a majority can send one player into interrogation: nobody holds their card, they hold none, no lifeline.
 - **Host settings** for all of these, shown to everyone in the lobby.
 - **Shorter private chat.** 10 words a message, with ready-made phrases and suit buttons; suits in messages are drawn as small cards in their colours, with a preview while you type.
 - **A Role button while choosing**, the same for everyone.
@@ -258,17 +259,16 @@ Every function takes the random number generator as a parameter. The game passes
 ### A state machine with timers owned by the server
 
 ```
-lobby ─start─▶ choose ─20 s or all locked in─▶ lights ─3 or 5 s─▶ discussion ─timer or host─▶ confinement
-                  ▲                                                                              │
-                  │                                                            timer or all answered
-               45 s                                                                              ▼
-                  │                                                                            reveal
-              cooldown ◀──────────────────────── no winner yet: next turn ◀──────────────────────┤
-                                                                                                 │
-                                                                           winner decided ─▶ over
+lobby ─start─▶ choose ─20 s or all locked in─▶ briefing ─45 s─▶ lights ─3 or 5 s─▶ discussion ─timer or host─▶ confinement
+                  ▲                                                                                                   │
+                  │                                                                                 timer or all answered
+                  │                                                                                                   ▼
+                  └───────────────────────────────── no winner yet: next turn ◀───────────────────────────────── reveal
+                                                                                                                      │
+                                                                                                winner decided ─▶ over
 ```
 
-Turn 1 goes straight from the lobby to choosing; every later turn starts in `cooldown`, with the cards already dealt and shown to nobody.
+Every turn starts with choosing. In the `briefing` the viewers are already assigned, so each phone gets `you.viewers`, `you.sees` and `you.sharedWith`, but no suit; the interrogation vote, if open, is decided when it ends.
 
 Each room has one `setTimeout` that fires when the current phase ends and calls `game.advance()`. The server sends `phaseEndsAt`, a timestamp, rather than "seconds left", so a message that arrives late still shows the right countdown. Phone clocks can be off by seconds or minutes, so every state also carries `serverNow`. The app keeps `offset = serverNow - Date.now()` and counts down against server time.
 
@@ -391,7 +391,7 @@ npm test
 
 The suite has 52 tests:
 
-- the rules engine on its own: the turn flow and its clocks (3 or 5 seconds of lights, the 45-second countdown from turn 2, in which nobody sees a card or can choose), ranked choices and their limits, first come first served, exactly 2 and 2 (1 and 1 with 4 or fewer), what each phase reveals, who else holds your cards, fair dealing over 4,000 turns, the lifeline (cell only, never on the last turn), the safe turn (any turn but the last), win conditions, deaths, players who leave, host hand-over, game numbers, and that no view ever contains your own card or anyone's token;
+- the rules engine on its own: the turn flow and its clocks (3 or 5 seconds of lights, the 45-second briefing after choosing, in which you know who holds whose card but see no suit), ranked choices and their limits, first come first served, exactly 2 and 2 (1 and 1 with 4 or fewer), what each phase reveals, who else holds your cards, fair dealing over 4,000 turns, the lifeline (cell only, never on the last turn), the safe turn (any turn but the last), win conditions, deaths, players who leave, host hand-over, game numbers, and that no view ever contains your own card or anyone's token;
 - the blackout: only the Jack, only during the talk, once per game, not on the last turn; in that cell it takes every other lifeline but not the Jack's; no other player's state mentions it until the game is over, and then only the turn; the host's two switches (the power, and whether the end reveals it), which nobody else's state shows;
 - `viewers.js` on its own: thousands of simulated turns for every player count from 3 to 20, the matching fallback on its own, and a check that every valid arrangement of random viewers is equally likely, against a brute-force list of all of them; for small games, the corner a greedy pass walks into, the first to lock in always getting their choice, and every pairing equally likely when nobody chooses;
 - a full five-player game over real sockets: the race for the same person, the glimpse, your 2 cards, the lifeline, a dropped phone that reconnects, an impostor with a wrong token, a blackout (with the side-channel check above), and the Jack's death;
@@ -428,7 +428,7 @@ app/
   src/suitImages.js   which suit image to use for each colour
   src/motion.js       native driver flag, reduced motion
   src/components/     mugshots, effects, flip card, hold button, sheets, QR code, the blackout, the chat
-  src/screens/        Home, Lobby, Cooldown, Choose, Lights, Discussion, Cell, Reveal, Dead, GameOver
+  src/screens/        Home, Lobby, Choose, Briefing, Lights, Discussion, Cell, Reveal, Dead, GameOver
   public/index.html   the web page around the app (lets Android shrink it for the keyboard)
 ```
 

@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-na
 import { Avatar, PlayerStrip } from '../components/Avatar';
 import { FlipCard } from '../components/FlipCard';
 import { HoldButton } from '../components/HoldButton';
-import { Interrogated } from '../components/Interrogation';
+import { Interrogated, InterrogationNote } from '../components/Interrogation';
 import { RoleOverlay } from '../components/Role';
 import { NotesSheet, WhoToldYou } from '../NotesViews';
 import { color } from '../theme';
@@ -64,7 +64,7 @@ export default function DiscussionScreen({ state, game, notes }) {
       />
       <PlayerStrip state={state} />
 
-      {you.interrogated ? <Interrogated state={state} /> : null}
+      {you.interrogated ? <Interrogated state={state} /> : <InterrogationNote state={state} />}
       {cards.length ? <Text style={styles.section}>{one ? 'The card you hold' : 'Your cards'}</Text> : null}
       <View style={styles.cards}>
         {cards.map((p) => {

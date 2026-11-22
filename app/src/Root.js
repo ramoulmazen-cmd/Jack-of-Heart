@@ -9,9 +9,9 @@ import { PhaseIntro } from './components/Effects';
 import { RoomMenu } from './components/RoomMenu';
 import { MenuContext } from './menu';
 import { PhotoContext } from './PhotoContext';
+import BriefingScreen from './screens/BriefingScreen';
 import CellScreen from './screens/CellScreen';
 import ChooseScreen from './screens/ChooseScreen';
-import CooldownScreen from './screens/CooldownScreen';
 import DeadScreen from './screens/DeadScreen';
 import DiscussionScreen from './screens/DiscussionScreen';
 import GameOverScreen from './screens/GameOverScreen';
@@ -72,20 +72,20 @@ function screenFor(state, game, notes) {
   if (phase === 'over') return <GameOverScreen key={key} state={state} game={game} />;
   const justDied = phase === 'reveal' && you.diedOnTurn === turn;
   if (!you.alive && !justDied) return <DeadScreen key="dead" state={state} game={game} />;
-  if (phase === 'cooldown') return <CooldownScreen key={key} state={state} game={game} />;
   if (phase === 'choose') return <ChooseScreen key={key} state={state} game={game} />;
+  if (phase === 'briefing') return <BriefingScreen key={key} state={state} game={game} />;
   if (phase === 'lights') return <LightsScreen key={key} state={state} game={game} />;
   if (phase === 'discussion') return <DiscussionScreen key={key} state={state} game={game} notes={notes} />;
   if (phase === 'confinement') return <CellScreen key={key} state={state} game={game} notes={notes} />;
   return <RevealScreen key={key} state={state} game={game} />;
 }
 
-// From turn 2 a turn opens with its countdown, so that's where "Turn N" goes; choosing then
-// starts with "Choose", the moment the countdown ends.
+// Every turn opens with choosing, so that's where "Turn N" goes. The talk starts with the
+// briefing (no cards yet); the lights' flash then marks the cards arriving, so the rest of the
+// talk needs no word of its own.
 const INTRO_WORDS = {
-  cooldown: (turn) => `Turn ${turn}`,
-  choose: (turn) => (turn === 1 ? 'Turn 1' : 'Choose'),
-  discussion: () => 'Talk',
+  choose: (turn) => `Turn ${turn}`,
+  briefing: () => 'Talk',
   confinement: () => 'Your cell',
 };
 const INTRO_MS = 1100;

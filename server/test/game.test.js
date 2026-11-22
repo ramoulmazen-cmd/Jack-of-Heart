@@ -4,8 +4,8 @@ import {
   CHAT_BURST,
   CHAT_BURST_MS,
   CHAT_MAX_LENGTH,
+  BRIEFING_SECONDS,
   CHOOSE_SECONDS,
-  COOLDOWN_SECONDS,
   Game,
   GameError,
   LIGHTS_SECONDS,
@@ -36,28 +36,33 @@ const wrongSuit = (suit) => SUITS.find((s) => s !== suit);
 
 /** Everyone locks in the next player in seat order, so nobody is chosen twice. */
 function chooseAll(game) {
-  if (game.phase === 'cooldown') game.advance(); // turns after the first open with a countdown
-  const ids = game.seatedPlayers.map((p) => p.id); // not whoever is in interrogation
+  const ids = game.activePlayers.map((p) => p.id);
   ids.forEach((id, i) => game.choose(id, [ids[(i + 1) % ids.length]]));
 }
 
-/** From the start of a turn to the discussion: choices, lights, talk. */
-function toTalk(game) {
+/** From choosing to the briefing: everyone locks in and the cards are dealt, face down. */
+function toBriefing(game) {
   chooseAll(game);
+  game.advance(); // briefing
+}
+
+/** From the start of a turn to the discussion: choices, the briefing, the lights, the talk. */
+function toTalk(game) {
+  if (game.phase === 'choose') toBriefing(game);
   game.advance(); // lights
   game.advance(); // discussion
 }
 
 /** From wherever the turn is to the cell. */
 function toCell(game) {
-  if (game.phase === 'cooldown' || game.phase === 'choose') toTalk(game);
+  if (game.phase === 'choose' || game.phase === 'briefing') toTalk(game);
   if (game.phase === 'lights') game.advance();
   if (game.phase === 'discussion') game.advance();
 }
 
 /** Play out the rest of the current turn; `pick` decides each player's answer. */
 function playTurn(game, pick = (p) => p.suit) {
-  if (game.phase === 'cooldown' || game.phase === 'choose') toTalk(game);
+  if (game.phase === 'choose' || game.phase === 'briefing') toTalk(game);
   if (game.phase === 'lights') game.advance();
   if (game.phase === 'discussion') game.advance();
   for (const p of game.alivePlayers) game.answer(p.id, pick(p));
@@ -90,12 +95,15 @@ test('names are cleaned and must be unique', () => {
   assert.equal(game.addPlayer('  Sara   B ').name, 'Sara B');
 });
 
-test('a turn runs choose → lights → discussion → confinement → reveal, on the right clocks', () => {
+test('a turn runs choose → briefing → lights → discussion → confinement → reveal, on the right clocks', () => {
   const { game, host } = setup(6);
   start(game, host);
   const left = () => game.phaseEndsAt - game.viewFor(host.id).serverNow;
   assert.equal(game.phase, 'choose');
   assert.equal(left(), CHOOSE_SECONDS * 1000);
+  game.advance();
+  assert.equal(game.phase, 'briefing');
+  assert.equal(left(), BRIEFING_SECONDS * 1000);
   game.advance();
   assert.equal(game.phase, 'lights');
   assert.equal(left(), LIGHTS_SECONDS * 1000, '6 players: 5 seconds of lights');
@@ -109,28 +117,27 @@ test('a turn runs choose → lights → discussion → confinement → reveal, o
   game.advance();
   assert.equal(game.phase, 'reveal');
   game.advance();
-  assert.equal(game.phase, 'cooldown', 'turn 2 opens with the countdown');
+  assert.equal(game.phase, 'choose', 'every turn starts with choosing');
   assert.equal(game.turn, 2);
-  assert.equal(left(), COOLDOWN_SECONDS * 1000);
-  game.advance();
-  assert.equal(game.phase, 'choose');
   assert.equal(left(), CHOOSE_SECONDS * 1000);
 });
 
-test('every turn but the first opens with a 45-second countdown, and nobody sees or does anything in it', () => {
-  const { game, players, host } = setup(5);
+test('the briefing: 45 seconds after choosing where you know who holds whose card, but see no suit', () => {
+  const { game, players, host } = setup(6);
   start(game, host);
-  assert.equal(game.phase, 'choose', 'turn 1 starts straight away');
-  for (let turn = 2; turn <= 3; turn++) {
-    playTurn(game);
-    game.advance();
-    assert.deepEqual([game.phase, game.turn], ['cooldown', turn]);
-    assert.equal(COOLDOWN_SECONDS, 45);
+  for (let turn = 1; turn <= 2; turn++) {
+    assert.deepEqual([game.phase, game.turn], ['choose', turn], 'every turn starts with choosing, the first too');
+    toBriefing(game);
+    assert.equal(game.phase, 'briefing');
+    assert.equal(BRIEFING_SECONDS, 45);
     for (const p of players) {
       const view = game.viewFor(p.id);
-      assert.deepEqual(shownTo(game, p), [], 'no card is shown during the countdown');
-      assert.deepEqual(view.you.sees, []);
-      assert.equal(view.you.locked, false);
+      assert.deepEqual(shownTo(game, p), [], 'no suit is shown in the briefing');
+      assert.deepEqual([...view.you.sees].sort(), [...game.sees.get(p.id)].sort(), 'but you know whose cards you hold');
+      assert.equal(view.you.sees.length, 2);
+      const { picked, random } = view.you.viewers;
+      assert.ok(picked && random, 'and who holds yours');
+      for (const id of view.you.sees) assert.ok(view.you.sharedWith[id], 'and who holds them with you');
       assert.equal(view.you.chatClosed, null, 'it is the time to talk');
     }
     const [a, b] = players;
@@ -138,9 +145,10 @@ test('every turn but the first opens with a 45-second countdown, and nobody sees
     assert.throws(() => game.answer(a.id, 'hearts'), { code: 'WRONG_PHASE' });
     assert.throws(() => game.useLifeline(a.id), { code: 'WRONG_PHASE' });
     assert.throws(() => game.skipDiscussion(host.id), { code: 'WRONG_PHASE' });
-    assert.ok(game.alivePlayers.every((p) => SUITS.includes(p.suit)), 'the cards are dealt, face down');
     game.advance();
-    assert.equal(game.phase, 'choose');
+    assert.equal(game.phase, 'lights', 'then the lights');
+    playTurn(game);
+    game.advance();
   }
 });
 
@@ -215,7 +223,8 @@ test('with 5 or fewer players the lights last 3 seconds', () => {
   for (const count of [3, 5]) {
     const { game, host } = setup(count);
     start(game, host);
-    game.advance();
+    game.advance(); // the briefing
+    game.advance(); // the lights
     assert.equal(game.phaseEndsAt - game.viewFor(host.id).serverNow, LIGHTS_SECONDS_SMALL * 1000);
   }
 });
@@ -288,6 +297,7 @@ test('with 4 or fewer players, you see 1 card and yours is seen by the 1 person 
   game.choose(p2.id, [p0.id]); // too slow: p1 already has p0
   game.choose(p3.id, [p2.id]);
   game.choose(p0.id, [p1.id]);
+  game.advance(); // the briefing
   game.advance(); // the lights: still every card but yours
   for (const p of players) assert.equal(shownTo(game, p).length, 3);
   const viewersOf = (p) => game.viewFor(p.id).you.viewers;
@@ -305,12 +315,12 @@ test('with 4 or fewer players, you see 1 card and yours is seen by the 1 person 
   }
 });
 
-test('the lights show every card but yours; the talk only your 2; the cell nothing', () => {
+test('the briefing shows no card; the lights every card but yours; the talk only your 2; the cell nothing', () => {
   const { game, players, host } = setup(7);
   start(game, host);
   for (let turn = 0; turn < 3; turn++) {
     chooseAll(game);
-    for (const phase of ['choose', 'lights', 'discussion', 'confinement']) {
+    for (const phase of ['choose', 'briefing', 'lights', 'discussion', 'confinement']) {
       if (phase !== 'choose') game.advance();
       assert.equal(game.phase, phase);
       for (const viewer of game.alivePlayers) {
@@ -318,6 +328,7 @@ test('the lights show every card but yours; the talk only your 2; the cell nothi
         const shown = shownTo(game, viewer);
         const expected = {
           choose: [],
+          briefing: [],
           lights: game.alivePlayers.map((p) => p.id).filter((id) => id !== viewer.id),
           discussion: game.sees.get(viewer.id),
           confinement: [],
@@ -360,7 +371,7 @@ test('cards are dealt fairly: each suit 1 in 4, unrelated to anyone else’s car
   const last = new Map();
   let table = null;
   for (let turn = 0; turn < 4000; turn += 1) {
-    if (!table || !['cooldown', 'choose'].includes(table.game.phase)) {
+    if (!table || table.game.phase !== 'choose') {
       table = setup(6);
       table.game.updateSettings(table.host.id, { maxTurns: 50 });
       start(table.game, table.host);
@@ -397,7 +408,8 @@ test('the lifeline works only in your cell, once per game, before you answer, an
   assert.throws(() => game.useLifeline(p0.id), { code: 'WRONG_PHASE' });
   start(game, host);
   assert.throws(() => game.useLifeline(p0.id), { code: 'WRONG_PHASE' }, 'not while choosing');
-  chooseAll(game);
+  toBriefing(game);
+  assert.throws(() => game.useLifeline(p0.id), { code: 'WRONG_PHASE' }, 'not in the briefing');
   game.advance();
   assert.throws(() => game.useLifeline(p0.id), { code: 'WRONG_PHASE' }, 'not in the lights');
   game.advance();
@@ -568,13 +580,12 @@ test('dead players see nothing, choose nothing, and nobody is assigned to them',
   start(game, host);
   const victim = game.alivePlayers.find((p) => p.id !== game.jackId);
   playTurn(game, (p) => (p.id === victim.id ? wrongSuit(p.suit) : p.suit));
-  game.advance(); // turn 2: the countdown
-  game.advance(); // choosing
+  game.advance(); // turn 2: choosing
   const someone = players.find((p) => p !== victim);
   assert.throws(() => game.choose(victim.id, [someone.id]), { code: 'NOT_ALIVE' });
   assert.throws(() => game.choose(someone.id, [victim.id]), { code: 'BAD_TARGET' });
-  chooseAll(game);
-  game.advance();
+  toBriefing(game);
+  game.advance(); // lights
   const view = game.viewFor(victim.id);
   assert.equal(view.you.viewers, null);
   assert.deepEqual(view.you.sees, []);
@@ -650,11 +661,12 @@ test('resume needs the right token; a player who leaves gets no viewers and thei
   assert.equal(game.authenticate(p2.id, p2.token), null);
   for (const p of game.activePlayers) if (!game.locks.has(p.id)) game.choose(p.id, [p3.id === p.id ? p1.id : p3.id]);
   assert.equal(game.everyoneChose, true, 'nobody waits for a player who left');
-  game.advance();
+  game.advance(); // the briefing
   assert.equal(game.viewers.has(p2.id), false);
   for (const { picked, random } of game.viewers.values()) assert.ok(picked !== p2.id && random !== p2.id);
   assert.equal(game.viewers.get(p3.id).picked, p1.id, 'p3 gets their 2nd choice');
   assert.equal(game.viewers.get(p3.id).rank, 2);
+  game.advance(); // the lights
   for (const viewer of game.activePlayers) assert.ok(!shownTo(game, viewer).includes(p2.id));
   game.advance();
   game.advance();
@@ -801,7 +813,8 @@ test('on a colour turn the Jack sees only red or black, and no real suit reaches
   const { game, host } = setup(6);
   start(game, host, null, { color: [1] });
   const jack = game.players.get(game.jackId);
-  chooseAll(game);
+  toBriefing(game);
+  assert.equal(game.viewFor(jack.id).you.powers.sight, 'color', 'he knows from the briefing');
   game.advance(); // lights
   const lights = game.viewFor(jack.id).players.filter((p) => p.suit);
   assert.equal(lights.length, 5);
@@ -824,7 +837,7 @@ test('on a blank turn one of the 2 cards the Jack holds is blank, in the lights 
   const { game, host } = setup(6);
   start(game, host, null, { blank: [1] });
   const jack = game.players.get(game.jackId);
-  chooseAll(game);
+  toBriefing(game);
   game.advance(); // lights
   const blank = game.viewFor(jack.id).players.filter((p) => p.suit === 'blank');
   assert.equal(blank.length, 1);
@@ -846,10 +859,14 @@ test('the fake: while choosing, the Jack makes one holder of a card see a false 
   assert.throws(() => game.fakeCard(jack.id, other.id), { code: 'FAKE_USED' });
   assert.equal(game.viewFor(jack.id).you.powers.fakesLeft, 1);
   assert.equal(game.viewFor(jack.id).you.powers.fakeTarget, target.id);
-  chooseAll(game);
+  toBriefing(game);
+  const told = game.viewFor(jack.id).you.powers.fake;
+  assert.ok(told?.viewerId, 'the Jack learns in the briefing who his fake fools');
+  assert.ok(game.viewFor(told.viewerId).players.every((p) => p.suit === null), 'but nobody sees a suit yet');
   game.advance(); // lights
 
   const { fake } = game.viewFor(jack.id).you.powers;
+  assert.deepEqual(fake, told);
   const entry = game.viewers.get(target.id);
   assert.equal(fake.targetId, target.id);
   assert.ok([entry.picked, entry.random].includes(fake.viewerId), 'the faked player really holds that card');
@@ -872,14 +889,13 @@ test('no fakes on the Jack’s colour or blank turns, outside choosing, or once 
   const jack = game.players.get(game.jackId);
   const [target] = notJack(game);
   game.fakeCard(jack.id, target.id); // turn 1
+  toBriefing(game);
+  assert.throws(() => game.fakeCard(jack.id, target.id), { code: 'WRONG_PHASE' }, 'not after choosing');
   playTurn(game);
-  game.advance(); // turn 2, countdown
-  assert.throws(() => game.fakeCard(jack.id, target.id), { code: 'WRONG_PHASE' });
-  game.advance(); // choose, on his colour turn
+  game.advance(); // turn 2: choosing, on his colour turn
   assert.throws(() => game.fakeCard(jack.id, target.id), { code: 'FAKE_LOCKED' });
   playTurn(game);
-  game.advance();
-  game.advance(); // turn 3, choose
+  game.advance(); // turn 3: choosing
   assert.throws(() => game.fakeCard(jack.id, target.id), { code: 'NO_FAKES' });
 
   const off = setup(5);
@@ -895,8 +911,7 @@ test('a fake that lands on no other holder does nothing and is given back', () =
   const [target] = notJack(game);
   game.fakeCard(jack.id, target.id);
   game.leave(target.id); // nobody holds the card of someone who left
-  chooseAll(game);
-  game.advance(); // lights
+  toBriefing(game);
   const { fake, fakesLeft } = game.viewFor(jack.id).you.powers;
   assert.deepEqual(fake, { targetId: target.id, viewerId: null, suit: null });
   assert.equal(fakesLeft, 2);
@@ -908,9 +923,9 @@ test('the interrogation vote opens after a quiet first half, or 2 turns before t
     start(game, host);
     const victim = notJack(game)[0];
     const open = [];
-    playTurn(game);
-    for (let turn = 2; turn <= 6; turn++) {
-      game.advance(); // countdown
+    for (let turn = 1; turn <= 6; turn++) {
+      if (turn > 1) game.advance(); // the next turn: choosing
+      toBriefing(game);
       if (game.interrogationOpen) open.push(turn);
       playTurn(game, (p) => (killOnTurn2 && turn === 2 && p.id === victim.id ? wrongSuit(p.suit) : p.suit));
     }
@@ -927,6 +942,7 @@ test('the interrogation vote needs more than 4 players, and can be switched off'
   const victim = notJack(small.game)[0];
   playTurn(small.game, (p) => (p.id === victim.id ? wrongSuit(p.suit) : p.suit));
   small.game.advance(); // turn 2 of 4: the vote's turn, but only 4 are left
+  toBriefing(small.game);
   assert.equal(small.game.interrogationOpen, false);
 
   const off = setup(6);
@@ -934,6 +950,7 @@ test('the interrogation vote needs more than 4 players, and can be switched off'
   start(off.game, off.host);
   playTurn(off.game);
   off.game.advance();
+  toBriefing(off.game);
   assert.equal(off.game.interrogationOpen, false);
   assert.equal(off.game.viewFor(off.host.id).interrogation, null);
   assert.throws(() => off.game.vote(off.host.id, notJack(off.game)[0].id), { code: 'VOTE_CLOSED' });
@@ -944,7 +961,8 @@ test('a majority sends one player into interrogation: unseen, seeing nothing, no
   game.updateSettings(host.id, { maxTurns: 4 });
   start(game, host);
   playTurn(game);
-  game.advance(); // turn 2 of 4, countdown: the vote is open
+  game.advance(); // turn 2 of 4: choosing
+  toBriefing(game); // the briefing: the vote is open
   assert.ok(game.interrogationOpen);
   const suspect = notJack(game)[0];
   const voters = game.activePlayers.filter((p) => p.id !== suspect.id);
@@ -960,18 +978,21 @@ test('a majority sends one player into interrogation: unseen, seeing nothing, no
   game.vote(voters[4].id, null); // and takes it back: still 4
   assert.equal(game.viewFor(host.id).interrogation.votes[suspect.id], 4);
 
-  game.advance(); // choose
+  const theyHeld = [...game.sees.get(suspect.id)];
+  game.advance(); // the lights
   assert.equal(game.interrogated, suspect.id);
   assert.equal(game.viewFor(suspect.id).you.interrogated, true);
   assert.equal(game.viewFor(host.id).interrogation.playerId, suspect.id, 'everyone knows who');
-  assert.throws(() => game.choose(suspect.id, [voters[0].id]), { code: 'INTERROGATED' });
-  assert.throws(() => game.choose(voters[0].id, [suspect.id]), { code: 'BAD_TARGET' });
-  chooseAll(game);
-  assert.ok(game.everyoneChose, 'nobody waits for the one in interrogation');
-  game.advance(); // lights
   assert.deepEqual(shownTo(game, suspect), [], 'they see no card');
   for (const p of voters) assert.ok(!shownTo(game, p).includes(suspect.id), `${p.name} doesn't see theirs`);
   assert.equal(game.viewers.has(suspect.id), false, 'and nobody holds it');
+  for (const { picked, random } of game.viewers.values()) {
+    assert.ok(picked !== suspect.id && random !== suspect.id, 'they hold nobody’s card any more');
+  }
+  for (const id of theyHeld) {
+    const { picked, random } = game.viewers.get(id);
+    assert.equal([picked, random].filter(Boolean).length, 1, 'the cards they held keep their other holder');
+  }
   game.advance(); // talk
   assert.deepEqual(game.viewFor(suspect.id).you.sees, []);
   game.advance(); // cell
@@ -981,6 +1002,7 @@ test('a majority sends one player into interrogation: unseen, seeing nothing, no
   assert.equal(suspect.alive, false);
 
   game.advance(); // turn 3: once a game
+  toBriefing(game);
   assert.equal(game.interrogated, null);
   assert.equal(game.interrogationOpen, false);
   assert.equal(game.viewFor(host.id).interrogation.used, true);
@@ -992,12 +1014,25 @@ test('only the host can close the room', () => {
   assert.doesNotThrow(() => game.closeBy(host.id));
 });
 
-test('no fakes while the Jack himself is in interrogation', () => {
+test('a fake whose fooled holder goes into interrogation does nothing and is given back', () => {
   const { game, host } = setup(6);
+  game.updateSettings(host.id, { maxTurns: 4 });
   start(game, host);
+  playTurn(game);
+  game.advance(); // turn 2 of 4: the vote's turn
   const jack = game.players.get(game.jackId);
-  game.interrogated = jack.id;
-  assert.throws(() => game.fakeCard(jack.id, notJack(game)[0].id), { code: 'INTERROGATED' });
+  const [target] = notJack(game);
+  game.fakeCard(jack.id, target.id);
+  toBriefing(game);
+  const { fake } = game.viewFor(jack.id).you.powers;
+  const holder = game.players.get(fake.viewerId);
+  for (const v of game.activePlayers.filter((p) => p !== holder).slice(0, game.votesNeeded)) game.vote(v.id, holder.id);
+  game.advance(); // the lights: the holder is alone
+  assert.equal(game.interrogated, holder.id);
+  const after = game.viewFor(jack.id).you.powers;
+  assert.deepEqual(after.fake, { targetId: target.id, viewerId: null, suit: null });
+  assert.equal(after.fakesLeft, 2, 'given back');
+  assert.ok(game.viewFor(holder.id).players.every((p) => p.suit === null), 'and they see nothing anyway');
 });
 
 test('Game Over reveals the Jack’s colour and blank turns that were played, and every fake', () => {
@@ -1009,8 +1044,7 @@ test('Game Over reveals the Jack’s colour and blank turns that were played, an
   playTurn(game); // turn 1: colour
   game.advance();
   playTurn(game); // turn 2: blank
-  game.advance();
-  game.advance(); // turn 3: choose
+  game.advance(); // turn 3: choosing
   game.fakeCard(jack.id, target.id);
   playTurn(game); // everyone answers right: time runs out
   game.advance();

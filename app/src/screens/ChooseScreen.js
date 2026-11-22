@@ -4,7 +4,6 @@ import { Platform, Pressable, ScrollView, StyleSheet, Text, Vibration, View, use
 import { Avatar, PlayerStrip } from '../components/Avatar';
 import { Stamp } from '../components/Effects';
 import { HoldButton } from '../components/HoldButton';
-import { Interrogated, InterrogationNote } from '../components/Interrogation';
 import { RoleOverlay } from '../components/Role';
 import { color, font } from '../theme';
 import { Button, CheckMark, ErrorText, Screen, TopBar, useAction } from '../ui';
@@ -18,8 +17,7 @@ export default function ChooseScreen({ state, game }) {
   const [ranking, setRanking] = useState([]);
   const [showRole, setShowRole] = useState(false);
   const { width } = useWindowDimensions();
-  const alone = state.interrogation?.playerId ?? null;
-  const options = state.players.filter((p) => p.alive && !p.left && p.id !== you.id && p.id !== alone);
+  const options = state.players.filter((p) => p.alive && !p.left && p.id !== you.id);
   // The Jack's fake: a long press on a picture, only he has it, and only on turns he sees clearly.
   const { powers } = you;
   const canFake = Boolean(powers && powers.fakesLeft > 0 && !powers.sight && !powers.fakeTarget);
@@ -55,9 +53,7 @@ export default function ChooseScreen({ state, game }) {
       style={styles.role}
     />
   );
-  const footer = you.interrogated ? (
-    <View style={styles.bar}>{role}</View>
-  ) : (
+  const footer = (
     <>
       <ErrorText>{error}</ErrorText>
       <View style={styles.bar}>
@@ -75,21 +71,10 @@ export default function ChooseScreen({ state, game }) {
     </>
   );
 
-  if (you.interrogated) {
-    return (
-      <Screen footer={footer} overlay={showRole ? <RoleOverlay state={state} /> : null}>
-        <TopBar state={state} game={game} title="Choose" />
-        <PlayerStrip state={state} />
-        <Interrogated />
-      </Screen>
-    );
-  }
-
   return (
     <Screen footer={footer} overlay={showRole ? <RoleOverlay state={state} /> : null}>
       <TopBar state={state} game={game} title="Choose" />
       <PlayerStrip state={state} />
-      <InterrogationNote state={state} />
       <Text style={styles.question}>Who sees your card?</Text>
       <Text style={styles.sub}>{maxChoices === 1 ? 'Pick one.' : 'Pick up to 3, best first.'}</Text>
       <ScrollView contentContainerStyle={styles.grid} showsVerticalScrollIndicator={false}>

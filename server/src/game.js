@@ -21,11 +21,10 @@ export const RANKING_FROM = 5;
 export const MAX_CHOICES = 3;
 export const REVEAL_SECONDS = 8;
 /**
- * Every turn after the first opens with this countdown: after a death there's something to
- * doubt, so the table gets time to argue before anyone chooses or sees a card. Turn 1 has nothing
- * to argue about yet, so it starts straight away.
+ * The briefing: right after choosing, before the lights. Everyone knows who holds their card and
+ * whose cards they hold, but nobody sees a suit yet. Time to argue, make deals, and vote.
  */
-export const COOLDOWN_SECONDS = 45;
+export const BRIEFING_SECONDS = 45;
 
 /** Private messages: how long one can be, how many each pair keeps, and how fast you can send. */
 export const CHAT_MAX_LENGTH = 200;
@@ -36,7 +35,8 @@ export const CHAT_BURST = 5;
 export const CHAT_BURST_MS = 5000;
 
 // The phases after viewers have been assigned.
-const VISION_PHASES = ['lights', 'discussion', 'confinement'];
+// The phases after viewers have been assigned: from the briefing on, you know who holds whose card.
+const VISION_PHASES = ['briefing', 'lights', 'discussion', 'confinement'];
 
 export const SETTING_LIMITS = {
   discussionSeconds: { min: 30, max: 3600, default: 180 },
@@ -68,7 +68,8 @@ export const SECRET_SWITCHES = { blackout: true, blackoutReveal: true };
  * The whole game as plain data + rules. No sockets, no timers, no I/O:
  * the network layer calls these methods and decides when to call advance().
  *
- * A turn: (from turn 2) cooldown (45 s, no cards) → choose (rank who you trust with your card)
+ * A turn: choose (rank who you trust with your card)
+ *       → briefing (45 s: who holds whose card, no suits; the interrogation vote)
  *       → lights (every card but yours, 3 or 5 s) → discussion (your 2 cards stay)
  *       → confinement (answer, lifeline) → reveal.
  * Living players can message each other privately the whole game, except in their cells.
@@ -255,9 +256,6 @@ export class Game {
     this.#requirePhase('choose', 'Choosing is over for this turn.');
     const player = this.players.get(playerId);
     if (!player?.alive || player.left) throw new GameError('NOT_ALIVE', 'Only living players choose.');
-    if (playerId === this.interrogated) {
-      throw new GameError('INTERROGATED', 'You are in interrogation: nobody sees your card this turn.');
-    }
     if (this.locks.has(playerId)) throw new GameError('LOCKED', 'You already locked in your choice.');
     if (!Array.isArray(ranking) || ranking.length === 0) {
       throw new GameError('BAD_TARGET', 'Choose at least one person.');
@@ -273,7 +271,6 @@ export class Game {
       if (id === playerId) throw new GameError('BAD_TARGET', 'Choose someone other than yourself.');
       const target = this.players.get(id);
       if (!target?.alive || target.left) throw new GameError('BAD_TARGET', 'That player is not in the game.');
-      if (id === this.interrogated) throw new GameError('BAD_TARGET', `${target.name} is in interrogation this turn.`);
     }
     this.locks.set(playerId, [...ranking]);
   }
@@ -297,12 +294,11 @@ export class Game {
       throw new GameError('NOT_ALLOWED', 'You can’t do that.');
     }
     this.#requirePhase('choose', 'You can only fake a card while everyone is choosing.');
-    if (playerId === this.interrogated) throw new GameError('INTERROGATED', 'No fakes in interrogation.');
     if (this.jackSight) throw new GameError('FAKE_LOCKED', 'No fakes on a turn you can’t see clearly.');
     if (this.fakeTarget !== null) throw new GameError('FAKE_USED', 'One fake per turn.');
     if (this.fakesLeft <= 0) throw new GameError('NO_FAKES', 'You have no fakes left.');
     const target = this.players.get(targetId);
-    if (!target?.alive || target.left || targetId === playerId || targetId === this.interrogated) {
+    if (!target?.alive || target.left || targetId === playerId) {
       throw new GameError('BAD_TARGET', 'You can’t fake that card.');
     }
     this.fakeTarget = targetId;
@@ -310,12 +306,12 @@ export class Game {
   }
 
   /**
-   * The interrogation vote is open during the countdown, once a game, with more than 4 players in:
+   * The interrogation vote is open during the briefing, once a game, with more than 4 players in:
    * right after the first half if nobody died in it, otherwise from 2 turns before the end.
-   * A player that more than half the table votes for spends the next turn alone (see #resolveVote).
+   * A player that more than half the table votes for spends the rest of the turn alone (#isolate).
    */
   get interrogationOpen() {
-    if (!this.settings.interrogation || this.interrogationUsed || this.phase !== 'cooldown') return false;
+    if (!this.settings.interrogation || this.interrogationUsed || this.phase !== 'briefing') return false;
     if (this.activePlayers.length <= 4) return false;
     const total = this.settings.maxTurns;
     const half = Math.floor(total / 2);
@@ -351,7 +347,7 @@ export class Game {
     return tally;
   }
 
-  /** When the countdown ends: a majority sends its player into interrogation for this turn. */
+  /** When the briefing ends: a majority sends its player into interrogation for the rest of the turn. */
   #resolveVote() {
     if (this.interrogationOpen) {
       for (const [target, count] of this.#tally()) {
@@ -359,11 +355,36 @@ export class Game {
           this.interrogated = target;
           this.interrogationUsed = true;
           this.interrogationTurn = this.turn;
+          this.#isolate(target);
           break;
         }
       }
     }
     this.votes = new Map();
+  }
+
+  /**
+   * Interrogation, after the cards were dealt: nobody holds that player's card any more, and they
+   * hold nobody's. The cards they would have held keep their other holder only. A fake that needed
+   * them (its card, or its fooled holder) is given back to the Jack; a blank card he no longer
+   * holds moves to the card he still does.
+   */
+  #isolate(id) {
+    this.viewers.delete(id);
+    for (const entry of this.viewers.values()) {
+      if (entry.picked === id) entry.picked = null;
+      if (entry.random === id) entry.random = null;
+    }
+    this.sees = cardsSeenBy(this.viewers);
+    if (this.fake?.viewerId && (this.fake.targetId === id || this.fake.viewerId === id)) {
+      this.fakeLog = this.fakeLog.filter((f) => !(f.turn === this.turn && f.targetId === this.fake.targetId));
+      this.fake = { targetId: this.fake.targetId, viewerId: null, suit: null };
+      this.fakesLeft += 1;
+    }
+    if (this.blankCardOf === id) {
+      const held = this.sees.get(this.jackId) ?? [];
+      this.blankCardOf = held.length ? held[this.#rng(held.length)] : null;
+    }
   }
 
   /** The turn limit's turn: no lifelines, no blackout, and never the safe turn. */
@@ -476,12 +497,12 @@ export class Game {
 
   /** Move to the next phase. Called by the server when the phase timer runs out. */
   advance() {
-    if (this.phase === 'cooldown') {
-      this.#resolveVote();
-      this.#sizeTurn();
-      this.#enter('choose', CHOOSE_SECONDS);
-    } else if (this.phase === 'choose') {
+    if (this.phase === 'choose') {
       this.#dealVision();
+    } else if (this.phase === 'briefing') {
+      this.#resolveVote();
+      const seated = this.seatedPlayers.length;
+      this.#enter('lights', seated <= SMALL_GAME ? LIGHTS_SECONDS_SMALL : LIGHTS_SECONDS);
     } else if (this.phase === 'lights') {
       this.#enter('discussion', this.settings.discussionSeconds);
     } else if (this.phase === 'discussion') {
@@ -688,8 +709,7 @@ export class Game {
       p.suit = SUITS[this.#rng(SUITS.length)];
       p.answer = null;
     }
-    if (this.turn === 1) this.#enter('choose', CHOOSE_SECONDS);
-    else this.#enter('cooldown', COOLDOWN_SECONDS);
+    this.#enter('choose', CHOOSE_SECONDS);
   }
 
   #dealVision() {
@@ -722,7 +742,7 @@ export class Game {
         this.fakesLeft += 1;
       }
     }
-    this.#enter('lights', ids.length <= SMALL_GAME ? LIGHTS_SECONDS_SMALL : LIGHTS_SECONDS);
+    this.#enter('briefing', BRIEFING_SECONDS);
   }
 
   #resolveTurn() {
