@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChatPill } from './components/ChatSheet';
 import { native, useReducedMotion } from './motion';
 import { SUIT_IMAGES, TINT_OF } from './suitImages';
+import { useMenu } from './menu';
 import { color, font, SUITS, suitInk } from './theme';
 import { useChatContext } from './useChat';
 
@@ -165,6 +166,7 @@ export function Countdown({ endsAt, clockOffset, size = 46, quiet = false }) {
  */
 export function TopBar({ state, game, title, action = null, clock = true }) {
   const chat = useChatContext();
+  const menu = useMenu();
   return (
     <View style={styles.topBar}>
       <View style={styles.fill}>
@@ -189,6 +191,20 @@ export function TopBar({ state, game, title, action = null, clock = true }) {
         </Pressable>
       ) : null}
       {clock ? <Countdown endsAt={state.phaseEndsAt} clockOffset={game.clockOffset} /> : null}
+      {menu && state.phase !== 'lights' ? (
+        <Pressable
+          role="button"
+          aria-label="Menu"
+          onPress={menu.open}
+          hitSlop={10}
+          style={({ pressed }) => [styles.menu, pressed && styles.buttonPressed]}
+        >
+          {/* Three dots drawn, not typed: no font needed. */}
+          {[0, 1, 2].map((i) => (
+            <View key={i} style={styles.menuDot} />
+          ))}
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -481,6 +497,8 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   topActionText: { color: color.paint, fontSize: 15, fontWeight: '800' },
+  menu: { flexDirection: 'column', gap: 3, paddingHorizontal: 8, paddingVertical: 6, marginLeft: 8 },
+  menuDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: color.faded },
   clock: { fontFamily: font.stencil, color: color.paint, fontVariant: ['tabular-nums'] },
   clockUrgent: { color: color.alarm },
   clockQuiet: { color: color.chalk },

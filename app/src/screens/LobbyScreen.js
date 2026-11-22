@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { PlayerGrid } from '../components/Avatar';
 import { Backdrop } from '../components/Backdrop';
+import { LeaveButtons } from '../components/LeaveButtons';
 import { InviteSheet, RulesSheet, SettingsSheet, settingsSummary } from '../components/LobbySheets';
 import { PhotoSheet } from '../components/PhotoSheet';
 import { color, font } from '../theme';
@@ -30,7 +31,7 @@ export default function LobbyScreen({ state, game }) {
           <Text style={styles.waitingText}>Waiting for the host</Text>
         </View>
       )}
-      <Button title="Leave" kind="quiet" onPress={game.leave} />
+      <LeaveButtons state={state} game={game} />
     </>
   );
 

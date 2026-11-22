@@ -101,8 +101,12 @@ Under it, **Reveal it at the end** decides what the Game Over screen says. On (t
 - **The Jack can't always see.** Colour turns (red or black only), a blank turn (one held card blank) and fakes (a holder sees a false suit). A Jack who never lies used to win almost every game; now he has to say something on turns he can't see, and his mistakes point at him.
 - **Interrogation vote.** Once a game, in the countdown, a majority can send one player into interrogation: no holders, no lifeline.
 - **Host settings** for all of these, shown to everyone in the lobby.
-- **Shorter private chat.** 10 words a message, with ready-made phrases and suit buttons; suits in messages are drawn as images.
+- **Shorter private chat.** 10 words a message, with ready-made phrases and suit buttons; suits in messages are drawn as small cards in their colours, with a preview while you type.
 - **A Role button while choosing**, the same for everyone.
+- **The host can close the room** for everyone: in the lobby, at Game Over, or during a game. It's a hold, so a stray tap never ends anyone's game. Every other phone goes back to the start screen with "The host closed the room."
+- **A ⋯ menu during the game**: how to play, leave the game (a hold), and for the host, close the room.
+- **Nobody waits for someone who left.** If the last player everyone was waiting for leaves while choosing or in the cell, the turn goes on at once.
+- **Game Over reveals the Jack's secrets**: his colour and blank turns, and every fake (who saw what, and what it really was).
 
 ## Version 5.9
 

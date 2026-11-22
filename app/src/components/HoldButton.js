@@ -8,7 +8,7 @@ import { color, font } from '../theme';
  * - With `onComplete`: a bar fills while you hold; let go early and nothing happens (the lifeline).
  * - With `onHoldStart` / `onHoldEnd`: something shows only while your finger is down (your role).
  */
-export function HoldButton({ label, onComplete, onHoldStart, onHoldEnd, holdMs = 650, tint = color.paint, disabled, style }) {
+export function HoldButton({ label, onComplete, onHoldStart, onHoldEnd, holdMs = 650, tint = color.paint, disabled, style, size = 20 }) {
   const fill = useRef(new Animated.Value(0)).current;
   const [down, setDown] = useState(false);
   const running = useRef(null);
@@ -49,7 +49,7 @@ export function HoldButton({ label, onComplete, onHoldStart, onHoldEnd, holdMs =
           style={[styles.fill, { backgroundColor: tint, transform: [{ scaleX: fill }] }]}
         />
       ) : null}
-      <Text style={[styles.label, { color: tint }]} numberOfLines={1}>
+      <Text style={[styles.label, { color: tint }, size !== 20 && { fontSize: size, lineHeight: size + 4 }]} numberOfLines={1}>
         {label}
       </Text>
     </Pressable>

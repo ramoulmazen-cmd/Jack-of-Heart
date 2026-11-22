@@ -193,6 +193,11 @@ export class Game {
     if (this.hostId === playerId) this.hostId = this.activeHostId;
   }
 
+  /** Only the host can close the room for everyone; the network layer then sends everyone home. */
+  closeBy(byId) {
+    this.#requireHost(byId);
+  }
+
   kick(byId, targetId) {
     this.#requireHost(byId);
     this.#requirePhase('lobby', 'Players can only be removed in the lobby.');
@@ -292,6 +297,7 @@ export class Game {
       throw new GameError('NOT_ALLOWED', 'You can’t do that.');
     }
     this.#requirePhase('choose', 'You can only fake a card while everyone is choosing.');
+    if (playerId === this.interrogated) throw new GameError('INTERROGATED', 'No fakes in interrogation.');
     if (this.jackSight) throw new GameError('FAKE_LOCKED', 'No fakes on a turn you can’t see clearly.');
     if (this.fakeTarget !== null) throw new GameError('FAKE_USED', 'One fake per turn.');
     if (this.fakesLeft <= 0) throw new GameError('NO_FAKES', 'You have no fakes left.');
@@ -598,6 +604,13 @@ export class Game {
               // a lifeline, or whether anyone did.
               blackout:
                 this.blackoutTurn === null || !this.settings.blackoutReveal ? null : { turn: this.blackoutTurn },
+              // The Jack's secrets come out too: the turns he couldn't see clearly (only the ones
+              // that were played), and every fake that fooled someone.
+              jackTurns: {
+                color: [...this.colorTurnSet].filter((t) => t <= this.turn).sort((a, b) => a - b),
+                blank: [...this.blankTurnSet].filter((t) => t <= this.turn).sort((a, b) => a - b),
+                fakes: this.fakeLog.map((f) => ({ ...f })),
+              },
             }
           : null,
     };
@@ -702,6 +715,7 @@ export class Game {
           viewerId: holders[this.#rng(holders.length)],
           suit: others[this.#rng(others.length)],
         };
+        this.fakeLog.push({ turn: this.turn, ...this.fake, real: target.suit });
       } else {
         // Nobody but the Jack holds that card (or it left the table): nothing to fake, so it's given back.
         this.fake = { targetId: this.fakeTarget, viewerId: null, suit: null };
@@ -764,6 +778,7 @@ export class Game {
     this.fakesLeft = 0;
     this.fakeTarget = null;
     this.fake = null;
+    this.fakeLog = []; // every fake that fooled someone, revealed at the end
     this.interrogated = null;
     this.interrogationUsed = false;
     this.interrogationTurn = null;

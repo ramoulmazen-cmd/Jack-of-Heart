@@ -1,8 +1,9 @@
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Avatar } from '../components/Avatar';
 import { Burst, Flash, Glow, Stamp } from '../components/Effects';
-import { color, font } from '../theme';
-import { Button, ErrorText, JackCard, Screen, useAction } from '../ui';
+import { LeaveButtons } from '../components/LeaveButtons';
+import { color, font, suitInk } from '../theme';
+import { Button, ErrorText, JackCard, Screen, SuitIcon, useAction } from '../ui';
 
 export default function GameOverScreen({ state, game }) {
   const { you, players, result } = state;
@@ -14,8 +15,10 @@ export default function GameOverScreen({ state, game }) {
   const cleared = result.winner === 'players';
   const jackWon = result.winner === 'jack';
   const blackout = result.blackout;
-  // Short phones give the card a little less room so the blackout line still fits.
-  const cardSize = height < 700 ? 110 : 150;
+  const secrets = result.jackTurns;
+  const hasSecrets = Boolean(secrets && (secrets.color.length || secrets.blank.length || secrets.fakes.length));
+  // Short phones give the card a little less room so the reveals underneath still fit.
+  const cardSize = height < 700 || hasSecrets ? (height < 700 ? 90 : 120) : 150;
 
   let verdict;
   if (you.isJack) verdict = jackWon ? 'You fooled them all.' : 'They found you.';
@@ -26,7 +29,7 @@ export default function GameOverScreen({ state, game }) {
     <>
       <ErrorText>{error}</ErrorText>
       {isHost ? <Button title="Play again" busy={busy} onPress={() => run(game.reset)} /> : null}
-      <Button title="Leave" kind="quiet" onPress={game.leave} />
+      <LeaveButtons state={state} game={game} />
     </>
   );
 
@@ -56,6 +59,7 @@ export default function GameOverScreen({ state, game }) {
         ) : null}
         <Text style={styles.verdict}>{verdict}</Text>
         {blackout ? <BlackoutReveal blackout={blackout} /> : null}
+        {hasSecrets ? <JackSecrets secrets={secrets} players={players} /> : null}
         {cleared && survivors.length ? (
           <View style={styles.survivors}>
             {survivors.map((p) => (
@@ -81,7 +85,67 @@ function BlackoutReveal({ blackout }) {
   );
 }
 
+/** A suit as a tiny white card in its real colour, the same as in the chat. */
+function MiniSuit({ suit }) {
+  return (
+    <View style={styles.miniSuit}>
+      <SuitIcon suit={suit} size={14} color={suitInk(suit)} />
+    </View>
+  );
+}
+
+const turnList = (turns) => (turns.length === 1 ? `turn ${turns[0]}` : `turns ${turns.join(', ')}`);
+
+/**
+ * The Jack's other secrets, for the argument after the game: the turns he couldn't see clearly,
+ * and every fake that fooled someone (who saw what, and what it really was).
+ */
+function JackSecrets({ secrets, players }) {
+  const name = (id) => players.find((p) => p.id === id)?.name ?? 'Someone';
+  return (
+    <View style={styles.secrets} aria-label="The Jack's secrets">
+      <Text style={styles.secretsTitle}>The Jack’s secrets</Text>
+      {secrets.color.length ? (
+        <Text style={styles.secretLine}>Only red or black on {turnList(secrets.color)}.</Text>
+      ) : null}
+      {secrets.blank.length ? <Text style={styles.secretLine}>A blank card on {turnList(secrets.blank)}.</Text> : null}
+      {secrets.fakes.map((f) => (
+        <View key={`${f.turn}-${f.targetId}`} style={styles.fakeLine}>
+          <Text style={styles.secretLine}>
+            Turn {f.turn}: {name(f.viewerId)} saw {name(f.targetId)}’s
+          </Text>
+          <MiniSuit suit={f.real} />
+          <Text style={styles.secretLine}>as</Text>
+          <MiniSuit suit={f.suit} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  secrets: {
+    alignItems: 'center',
+    gap: 3,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: color.wallLine,
+    backgroundColor: 'rgba(12, 9, 10, 0.6)',
+    maxWidth: '100%',
+  },
+  secretsTitle: { color: color.paint, fontSize: 13, fontWeight: '800', letterSpacing: 0.5 },
+  secretLine: { color: color.chalk, fontSize: 14, lineHeight: 19, textAlign: 'center' },
+  fakeLine: { flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap', justifyContent: 'center' },
+  miniSuit: {
+    width: 22,
+    height: 24,
+    borderRadius: 5,
+    backgroundColor: color.stock,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   stage: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
   headline: { marginTop: 10 },
   jackRow: { flexDirection: 'row', alignItems: 'center', gap: 10, maxWidth: '100%' },

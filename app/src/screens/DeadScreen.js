@@ -1,14 +1,15 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { Avatar, PlayerGrid } from '../components/Avatar';
+import { LeaveButtons } from '../components/LeaveButtons';
 import { color, font } from '../theme';
-import { Button, Screen, clockText, useSecondsLeft } from '../ui';
+import { Screen, clockText, useSecondsLeft } from '../ui';
 
 /** You're out: your mugshot, stamped, and everyone else's state while the game goes on. */
 export default function DeadScreen({ state, game }) {
   const others = state.players.filter((p) => p.id !== state.you.id && !(p.left && !p.alive));
   const alive = others.filter((p) => p.alive).length;
   return (
-    <Screen scroll footer={<Button title="Leave the game" kind="quiet" onPress={game.leave} />}>
+    <Screen scroll footer={<LeaveButtons state={state} game={game} leaveTitle="Leave the game" />}>
       <View style={styles.me}>
         <Avatar player={state.players.find((p) => p.id === state.you.id)} size={140} out />
         <Text style={styles.title}>You’re out</Text>

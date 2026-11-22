@@ -986,6 +986,51 @@ test('a majority sends one player into interrogation: unseen, seeing nothing, no
   assert.equal(game.viewFor(host.id).interrogation.used, true);
 });
 
+test('only the host can close the room', () => {
+  const { game, players, host } = setup(3);
+  assert.throws(() => game.closeBy(players[1].id), { code: 'NOT_HOST' });
+  assert.doesNotThrow(() => game.closeBy(host.id));
+});
+
+test('no fakes while the Jack himself is in interrogation', () => {
+  const { game, host } = setup(6);
+  start(game, host);
+  const jack = game.players.get(game.jackId);
+  game.interrogated = jack.id;
+  assert.throws(() => game.fakeCard(jack.id, notJack(game)[0].id), { code: 'INTERROGATED' });
+});
+
+test('Game Over reveals the Jack’s colour and blank turns that were played, and every fake', () => {
+  const { game, host } = setup(6);
+  game.updateSettings(host.id, { maxTurns: 3 });
+  start(game, host, null, { color: [1], blank: [2] });
+  const jack = game.players.get(game.jackId);
+  const [target] = notJack(game);
+  playTurn(game); // turn 1: colour
+  game.advance();
+  playTurn(game); // turn 2: blank
+  game.advance();
+  game.advance(); // turn 3: choose
+  game.fakeCard(jack.id, target.id);
+  playTurn(game); // everyone answers right: time runs out
+  game.advance();
+  assert.equal(game.phase, 'over');
+  const { jackTurns } = game.viewFor(target.id).result;
+  assert.deepEqual(jackTurns.color, [1]);
+  assert.deepEqual(jackTurns.blank, [2]);
+  assert.equal(jackTurns.fakes.length, 1);
+  assert.equal(jackTurns.fakes[0].turn, 3);
+  assert.equal(jackTurns.fakes[0].targetId, target.id);
+  assert.notEqual(jackTurns.fakes[0].suit, jackTurns.fakes[0].real, 'what they saw, and what it really was');
+
+  // A turn that never came is never revealed.
+  const early = setup(6);
+  start(early.game, early.host, null, { blank: [3] });
+  playTurn(early.game, (p) => (p.id === early.game.jackId ? wrongSuit(p.suit) : p.suit)); // the Jack dies on turn 1
+  early.game.advance();
+  assert.deepEqual(early.game.viewFor(early.host.id).result.jackTurns.blank, []);
+});
+
 test('a private message is at most 10 words; a suit symbol counts as one', () => {
   const { game, host } = setup(5);
   start(game, host);

@@ -1,11 +1,13 @@
 import * as Haptics from 'expo-haptics';
 import { useKeepAwake } from 'expo-keep-awake';
 import { usePreventScreenCapture } from 'expo-screen-capture';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, StyleSheet, Text, Vibration, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChatSheet } from './components/ChatSheet';
 import { PhaseIntro } from './components/Effects';
+import { RoomMenu } from './components/RoomMenu';
+import { MenuContext } from './menu';
 import { PhotoContext } from './PhotoContext';
 import CellScreen from './screens/CellScreen';
 import ChooseScreen from './screens/ChooseScreen';
@@ -34,6 +36,13 @@ export default function Root() {
   const chat = useChat(game);
   const intro = usePhaseIntro(state);
   usePhaseFeedback(state);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menu = useMemo(() => ({ open: () => setMenuOpen(true) }), []);
+  const inRoom = Boolean(state?.you);
+  // A menu left open must not pop up again the next time you join a room.
+  useEffect(() => {
+    if (!inRoom) setMenuOpen(false);
+  }, [inRoom]);
 
   if (!game.ready) return <View style={styles.fill} />;
   if (!state?.you) return game.session ? <Rejoining game={game} /> : <HomeScreen game={game} />;
@@ -41,13 +50,16 @@ export default function Root() {
   return (
     <PhotoContext.Provider value={{ base: game.session?.url ?? game.serverUrl, code: state.code }}>
       <ChatContext.Provider value={chat}>
-        <View style={styles.fill}>
-          {Platform.OS !== 'web' ? <PhoneOnly /> : <WebOnly />}
-          {screenFor(state, game, notes)}
-          {intro ? <PhaseIntro key={`intro-${intro.key}`} word={intro.word} /> : null}
-          {game.connected ? null : <OfflineBanner />}
-          <ChatSheet state={state} />
-        </View>
+        <MenuContext.Provider value={menu}>
+          <View style={styles.fill}>
+            {Platform.OS !== 'web' ? <PhoneOnly /> : <WebOnly />}
+            {screenFor(state, game, notes)}
+            {intro ? <PhaseIntro key={`intro-${intro.key}`} word={intro.word} /> : null}
+            {game.connected ? null : <OfflineBanner />}
+            <ChatSheet state={state} />
+            <RoomMenu state={state} game={game} visible={menuOpen} onClose={() => setMenuOpen(false)} />
+          </View>
+        </MenuContext.Provider>
       </ChatContext.Provider>
     </PhotoContext.Provider>
   );

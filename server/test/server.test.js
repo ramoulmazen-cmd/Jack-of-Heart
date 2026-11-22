@@ -66,7 +66,8 @@ function truthFromLights(group, turn) {
   const truth = new Map();
   for (const viewer of group) {
     for (const p of stateOf(viewer, 'lights', turn).players) {
-      if (p.suit) truth.set(p.id, p.suit);
+      // Only real suits: on the Jack's colour or blank turns his phone shows 'red', 'black' or 'blank'.
+      if (SUITS.includes(p.suit)) truth.set(p.id, p.suit);
     }
   }
   return truth;
@@ -89,7 +90,12 @@ test('a full game over real sockets: ranked choices, the glimpse, your 2 cards, 
 
   await call(host, 'game:settings', { discussionSeconds: 3600, answerSeconds: 300 });
   assert.equal((await call(host, 'game:start')).ok, true);
-  server.rooms.get(created.code).game.safeTurn = null; // keep this game deadly; the rules tests cover the safe turn
+  // Keep this game deadly and the Jack's sight normal: the rules tests cover the safe turn and his
+  // colour and blank turns.
+  const started = server.rooms.get(created.code).game;
+  started.safeTurn = null;
+  started.colorTurnSet = new Set();
+  started.blankTurnSet = new Set();
   await Promise.all(everyone.map((c) => waitFor(c, (s) => s.phase === 'choose' && s.turn === 1)));
   const jack = everyone.find((c) => c.state.you.isJack);
   assert.equal(host.state.maxChoices, 3, '5 players: rank up to 3');
@@ -263,6 +269,42 @@ test('private chat: only the two players hear a message, and nobody else is sent
   assert.equal((await call(a, 'chat:send', { to: 'nobody', text: 'x' })).error, 'BAD_TARGET');
   assert.equal((await call(a, 'chat:send', { to: b.id, text: '' })).error, 'EMPTY_MESSAGE');
   assert.equal((await call(a, 'chat:send', { to: b.id })).error, 'EMPTY_MESSAGE');
+});
+
+test('the host can close the room: every other phone is sent home, and the room is gone', async () => {
+  const table = [player(), player(), player()];
+  const [host, b, c] = table;
+  const created = await call(host, 'room:create', { name: 'Closer' });
+  for (const [i, p] of [b, c].entries()) await call(p, 'room:join', { code: created.code, name: `Guest ${i}` });
+  assert.equal((await call(b, 'room:close')).error, 'NOT_HOST', 'only the host can close it');
+  await call(host, 'game:start');
+  await Promise.all(table.map((p) => waitFor(p, (s) => s.phase === 'choose')));
+
+  assert.equal((await call(host, 'room:close')).ok, true, 'even in the middle of a game');
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  assert.ok(b.events.includes('closed') && c.events.includes('closed'), 'everyone else is told');
+  assert.equal(host.events.includes('closed'), false, 'the host just gets the reply');
+  assert.equal(server.rooms.has(created.code), false, 'the room is gone');
+  assert.equal((await call(b, 'turn:choose', { ranking: [] })).error, 'NOT_IN_ROOM');
+  const resumed = await call(c, 'room:resume', { code: created.code, playerId: 'x', token: 'y' });
+  assert.equal(resumed.error, 'SESSION_EXPIRED', 'a phone waking up later finds no game');
+});
+
+test('when the last player everyone is waiting for leaves, the turn goes on without the clock', async () => {
+  const table = [player(), player(), player(), player()];
+  const [a, b, c, d] = table;
+  const created = await call(a, 'room:create', { name: 'Wait A' });
+  a.id = created.playerId;
+  for (const [i, p] of [b, c, d].entries()) p.id = (await call(p, 'room:join', { code: created.code, name: `Wait ${i}` })).playerId;
+  await call(a, 'game:start');
+  await Promise.all(table.map((p) => waitFor(p, (s) => s.phase === 'choose' && s.turn === 1)));
+  await call(a, 'turn:choose', { ranking: [b.id] });
+  await call(b, 'turn:choose', { ranking: [c.id] });
+  await call(c, 'turn:choose', { ranking: [a.id] });
+  const left = Date.now();
+  await call(d, 'room:leave');
+  await waitFor(a, (s) => s.phase === 'lights', 2000);
+  assert.ok(Date.now() - left < 500, 'the lights came on right away, not when the choosing clock ran out');
 });
 
 test('mugshots: upload over the socket, everyone sees the new version, the image comes over HTTP', async () => {

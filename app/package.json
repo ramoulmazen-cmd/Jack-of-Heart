@@ -1,6 +1,6 @@
 {
   "name": "app",
-  "version": "5.9.0",
+  "version": "6.0.0",
   "main": "index.js",
   "dependencies": {
     "@expo-google-fonts/big-shoulders-stencil": "^0.4.1",

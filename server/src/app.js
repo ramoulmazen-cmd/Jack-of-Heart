@@ -187,8 +187,32 @@ export function createGameServer({ timeScale = 1, webDir, lanAddresses = () => [
       socket.data = {};
       game.leave(playerId);
       const everyoneGone = [...game.players.values()].every((p) => p.left);
-      if (everyoneGone) closeRoom(game.code);
-      else broadcast(room);
+      if (everyoneGone) {
+        closeRoom(game.code);
+        return;
+      }
+      // If they were the last one the others were waiting for, nobody waits for the clock.
+      if ((game.phase === 'choose' && game.everyoneChose) || (game.phase === 'confinement' && game.everyoneAnswered)) {
+        game.advance();
+        schedule(room);
+      }
+      broadcast(room);
+    });
+
+    // The host ends the room for everyone: every other phone is told, and goes back home.
+    handle('room:close', () => {
+      const { room, game, playerId } = current();
+      game.closeBy(playerId);
+      for (const [id, socketId] of room.sockets) {
+        if (id === playerId) continue;
+        const other = io.sockets.sockets.get(socketId);
+        if (other) {
+          other.data = {};
+          other.emit('closed');
+        }
+      }
+      socket.data = {};
+      closeRoom(game.code);
     });
 
     handle('player:photo', ({ photo }) => {

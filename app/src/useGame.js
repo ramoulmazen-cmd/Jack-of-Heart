@@ -81,6 +81,7 @@ export function useGame() {
         setState(next);
       });
       socket.on('kicked', () => endSession('The host removed you from the room.'));
+      socket.on('closed', () => endSession('The host closed the room.'));
       socket.on('chat:message', (message) => chatListeners.current.forEach((listener) => listener(message)));
 
       socketRef.current = socket;
@@ -224,6 +225,11 @@ export function useGame() {
     kick: (playerId) => request('game:kick', { playerId }),
     reset: () => request('game:reset'),
     leave,
+    // The host only: ends the room for everyone (every other phone gets 'closed').
+    closeRoom: async () => {
+      await request('room:close');
+      await endSession();
+    },
     forget: () => endSession(),
   };
 }

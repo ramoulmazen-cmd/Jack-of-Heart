@@ -257,6 +257,12 @@ function Composer({ chat, other }) {
           {words}/{MAX_WORDS} words
         </Text>
       </View>
+      {/* Some phones draw ♠♥♦♣ as nothing in a text box: show the message as it will look. */}
+      {SUIT_CHARS.test(draft) ? (
+        <View style={styles.preview}>
+          <MessageText text={draft} />
+        </View>
+      ) : null}
       <View style={styles.composer}>
         <TextInput
           aria-label="Message"
@@ -369,6 +375,17 @@ const styles = StyleSheet.create({
   },
   count: { marginLeft: 'auto', color: color.faded, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] },
   countOver: { color: color.alarm },
+  preview: {
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: color.wallLine,
+    marginBottom: 8,
+  },
 
   closed: { color: color.alarm, fontSize: 15, lineHeight: 21, textAlign: 'center', paddingVertical: 10 },
   error: { color: color.alarm, fontSize: 14, textAlign: 'center' },
