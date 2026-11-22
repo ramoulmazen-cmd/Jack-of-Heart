@@ -42,6 +42,7 @@
       }
       img {
         -webkit-user-drag: none;
+        pointer-events: none; /* pictures are never what you press: no image menu, no drag */
       }
       html,
       body {
@@ -57,15 +58,24 @@
       }
     </style>
     <script>
-      // Long-press menus (Android's "copy / share", a desktop right-click) are off outside text boxes:
-      // opening one cancels the hold underneath it.
+      // Long-press menus (Android's "copy / share", a desktop right-click) are off outside text boxes.
+      // The phone's long press is also kept away from the app entirely: react-native-web treats it
+      // (and a text selection) as "the press is over", which let go of a held card after half a second.
       (function () {
         var typing = function (target) {
           var el = target && target.nodeType === 1 ? target : target && target.parentElement;
           return Boolean(el && el.closest && el.closest('input, textarea'));
         };
-        document.addEventListener('contextmenu', function (e) {
-          if (!typing(e.target)) e.preventDefault();
+        var typingNow = function () {
+          return typing(document.activeElement);
+        };
+        window.addEventListener('contextmenu', function (e) {
+          if (typing(e.target)) return;
+          e.preventDefault();
+          e.stopImmediatePropagation();
+        }, true);
+        document.addEventListener('selectionchange', function (e) {
+          if (!typingNow()) e.stopImmediatePropagation();
         }, true);
         document.addEventListener('selectstart', function (e) {
           if (!typing(e.target)) e.preventDefault();

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Avatar, PlayerStrip } from '../components/Avatar';
 import { FlipCard } from '../components/FlipCard';
+import { HoldArea } from '../components/HoldArea';
 import { HoldButton } from '../components/HoldButton';
 import { Interrogated, InterrogationNote } from '../components/Interrogation';
 import { RoleOverlay } from '../components/Role';
@@ -71,13 +72,13 @@ export default function DiscussionScreen({ state, game, notes }) {
           const other = nameOf(you.sharedWith?.[p.id]);
           const shown = held === p.id;
           return (
-            <Pressable
+            <HoldArea
               key={p.id}
               role="button"
               aria-label={`Hold to see ${p.name}'s card`}
-              onPressIn={() => setHeld(p.id)}
+              onHoldStart={() => setHeld(p.id)}
               // With two fingers down, letting go of one card must not hide the other.
-              onPressOut={() => setHeld((current) => (current === p.id ? null : current))}
+              onHoldEnd={() => setHeld((current) => (current === p.id ? null : current))}
               style={styles.cardTile}
             >
               <FlipCard size={size} suit={shown ? p.suit : null} faceUp={shown} />
@@ -96,7 +97,7 @@ export default function DiscussionScreen({ state, game, notes }) {
                   </Text>
                 </View>
               ) : null}
-            </Pressable>
+            </HoldArea>
           );
         })}
       </View>

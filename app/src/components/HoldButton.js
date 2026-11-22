@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text } from 'react-native';
+import { Animated, Easing, StyleSheet, Text } from 'react-native';
 import { native } from '../motion';
 import { color, font } from '../theme';
+import { HoldArea } from './HoldArea';
 
 /**
  * A button you hold instead of tap.
@@ -34,13 +35,13 @@ export function HoldButton({ label, onComplete, onHoldStart, onHoldEnd, holdMs =
   };
 
   return (
-    <Pressable
+    <HoldArea
       role="button"
       aria-label={label}
       accessibilityHint="Hold"
       disabled={disabled}
-      onPressIn={pressIn}
-      onPressOut={pressOut}
+      onHoldStart={pressIn}
+      onHoldEnd={pressOut}
       style={[styles.button, { borderColor: tint }, down && styles.down, disabled && styles.disabled, style]}
     >
       {onComplete ? (
@@ -52,7 +53,7 @@ export function HoldButton({ label, onComplete, onHoldStart, onHoldEnd, holdMs =
       <Text style={[styles.label, { color: tint }, size !== 20 && { fontSize: size, lineHeight: size + 4 }]} numberOfLines={1}>
         {label}
       </Text>
-    </Pressable>
+    </HoldArea>
   );
 }
 
