@@ -24,7 +24,97 @@
         height: 100%;
         flex: 1;
       }
+
+      /* A phone browser treats a long press as "select this text" or "save this image", which
+         steals the hold the game needs (Role, your cards, the lifeline, the Jack's fake).
+         Nothing in the game is meant to be selected or copied, except what you type. */
+      * {
+        -webkit-user-select: none !important;
+        user-select: none !important;
+        -webkit-touch-callout: none !important;
+        -webkit-tap-highlight-color: transparent;
+      }
+      input,
+      textarea {
+        -webkit-user-select: text !important;
+        user-select: text !important;
+        -webkit-touch-callout: default !important;
+      }
+      img {
+        -webkit-user-drag: none;
+      }
+      html,
+      body {
+        touch-action: manipulation; /* no double-tap zoom in the middle of a hold */
+        overscroll-behavior: none; /* no pull-to-refresh that drops you out of the game */
+      }
+
+      /* Printing (or "print to PDF") shows nothing. */
+      @media print {
+        body {
+          display: none !important;
+        }
+      }
     </style>
+    <script>
+      // Long-press menus (Android's "copy / share", a desktop right-click) are off outside text boxes:
+      // opening one cancels the hold underneath it.
+      (function () {
+        var typing = function (target) {
+          var el = target && target.nodeType === 1 ? target : target && target.parentElement;
+          return Boolean(el && el.closest && el.closest('input, textarea'));
+        };
+        document.addEventListener('contextmenu', function (e) {
+          if (!typing(e.target)) e.preventDefault();
+        }, true);
+        document.addEventListener('selectstart', function (e) {
+          if (!typing(e.target)) e.preventDefault();
+        }, true);
+        document.addEventListener('dragstart', function (e) {
+          e.preventDefault();
+        }, true);
+      })();
+
+      // A browser can't block the phone's screenshot buttons (the app can, and does). What a page can
+      // do: cover the game the moment you leave it (switching apps, the notification shade, another
+      // window), so app-switcher previews and many screenshot tools catch a blank screen, and cover
+      // it for a moment when Print Screen is pressed on a computer.
+      (function () {
+        var shield;
+        var cover = function () {
+          if (shield) shield.style.display = 'flex';
+        };
+        var uncover = function () {
+          if (shield && !document.hidden) shield.style.display = 'none';
+        };
+        document.addEventListener('DOMContentLoaded', function () {
+          shield = document.createElement('div');
+          shield.setAttribute('aria-hidden', 'true');
+          shield.style.cssText =
+            'position:fixed;inset:0;z-index:2147483647;display:none;align-items:center;justify-content:center;' +
+            'background:#17211C;color:#8D9F95;font:700 16px system-ui,sans-serif;';
+          shield.textContent = 'Jack of Hearts';
+          document.body.appendChild(shield);
+        });
+        document.addEventListener('visibilitychange', function () {
+          if (document.hidden) cover();
+          else uncover();
+        });
+        window.addEventListener('pagehide', cover);
+        window.addEventListener('blur', cover);
+        window.addEventListener('focus', uncover);
+        var printScreen = function (e) {
+          if (e.key !== 'PrintScreen') return;
+          cover();
+          try {
+            if (navigator.clipboard) navigator.clipboard.writeText('').catch(function () {});
+          } catch (err) {}
+          setTimeout(uncover, 1500);
+        };
+        document.addEventListener('keydown', printScreen, true);
+        document.addEventListener('keyup', printScreen, true);
+      })();
+    </script>
   </head>
 
   <body>

@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Avatar } from '../components/Avatar';
 import { Flash } from '../components/Effects';
-import { Interrogated, InterrogationNote } from '../components/Interrogation';
 import { native, useReducedMotion } from '../motion';
 import { color } from '../theme';
 import { Card, Screen, TopBar } from '../ui';
@@ -24,19 +23,9 @@ export default function LightsScreen({ state, game }) {
   const byHeight = Math.floor((height - 260 - rows * 34) / (rows * 1.4));
   const size = Math.max(40, Math.min(150, byWidth, byHeight));
 
-  if (state.you.interrogated) {
-    return (
-      <Screen>
-        <TopBar state={state} game={game} title="Lights" />
-        <Interrogated />
-      </Screen>
-    );
-  }
-
   return (
     <Screen overlay={<Flash tint="#FFF7E2" peak={0.9} duration={650} />}>
       <TopBar state={state} game={game} title="Lights" />
-      <InterrogationNote state={state} />
       <View aria-label="Every card but yours" style={styles.table}>
         <View style={[styles.cards, { gap: GAP }]}>
           {cards.map((p, i) => (

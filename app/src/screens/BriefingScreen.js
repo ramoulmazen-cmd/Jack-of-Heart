@@ -8,9 +8,9 @@ import { useChatContext } from '../useChat';
 import { Button, Card, ErrorText, Screen, TopBar, clockText, useAction, useSecondsLeft, viewersOf } from '../ui';
 
 /**
- * The 45 seconds right after choosing, before the lights. You know whose cards you'll hold and who
- * holds yours, but nobody sees a suit yet: time to make deals, set traps, and maybe vote someone
- * into interrogation.
+ * The 45 seconds right after the lights, before the talk. Everyone glimpsed every card; now you
+ * learn whose cards you'll hold and who holds yours, but nobody can look at a card yet: time to make
+ * deals, set traps, and maybe vote someone into interrogation.
  */
 export default function BriefingScreen({ state, game }) {
   const { you } = state;
@@ -49,10 +49,12 @@ export default function BriefingScreen({ state, game }) {
     <Screen footer={footer} overlay={showRole ? <RoleOverlay state={state} /> : null}>
       <TopBar state={state} game={game} title="Talk" clock={false} />
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-        <View style={styles.clockBlock} aria-label={`The lights come on in ${left} seconds`}>
-          <Text style={styles.until}>Lights in</Text>
+        <View style={styles.clockBlock} aria-label={`Your cards come in ${left} seconds`}>
+          <Text style={styles.until}>Your cards in</Text>
           <Text style={[styles.clock, left <= 10 && styles.clockSoon]}>{clockText(left)}</Text>
-          <Text style={styles.why}>You know who holds whose card. Nobody sees a suit until the lights.</Text>
+          <Text style={styles.why}>
+            You saw every card. Now you know who holds whose card, but nobody can look at one until the clock runs out.
+          </Text>
         </View>
 
         <Text style={styles.section}>You’ll hold</Text>
@@ -106,8 +108,8 @@ function VotePanel({ state, poll, onVote }) {
     <View style={styles.vote}>
       <Text style={styles.voteTitle}>Interrogation vote</Text>
       <Text style={styles.voteLine}>
-        Once a game. {poll.needed} votes send a player alone for the rest of this turn: nobody holds their card, they hold
-        none, no lifeline.
+        Once a game. {poll.needed} votes send a player alone for the rest of this turn: their card is swapped for one nobody
+        has seen, nobody holds it, they hold none, no lifeline.
       </Text>
       <View style={styles.voteGrid}>
         {others.map((p) => {

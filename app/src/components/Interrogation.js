@@ -14,7 +14,8 @@ export function Interrogated() {
     <View style={[styles.box, styles.alone]} role="alert">
       <Text style={styles.title}>Interrogation</Text>
       <Text style={styles.line}>
-        The table voted you alone. Nobody sees your card and you see none. No lifeline: in your cell, you guess.
+        The table voted you alone. Your card was swapped for one nobody has seen: nobody holds it and you hold none.
+        No lifeline: in your cell, you guess.
       </Text>
     </View>
   );
@@ -28,7 +29,8 @@ export function InterrogationNote({ state }) {
     <View style={[styles.box, styles.row]} aria-label={`${player.name} is in interrogation this turn`}>
       <Avatar player={player} size={30} />
       <Text style={styles.note}>
-        <Text style={styles.name}>{player.name}</Text> is in interrogation: nobody sees their card this turn.
+        <Text style={styles.name}>{player.name}</Text> is in interrogation: their card was swapped for one nobody has seen,
+        and nobody holds it.
       </Text>
     </View>
   );

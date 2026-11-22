@@ -185,12 +185,12 @@ export function SettingsSheet({ visible, onClose, state, game }) {
 
 const STEPS = [
   { icon: 'choose', title: 'Choose', line: 'Rank who sees your card. The 2 fastest get each person, or just the fastest with 4 or fewer.' },
+  { icon: 'lights', title: 'Lights', line: 'See every card but yours for a few seconds.' },
   {
     icon: 'cooldown',
     title: '45 seconds',
-    line: 'You learn who holds your card and whose cards you hold, but nobody sees a suit yet. Make deals.',
+    line: 'You learn who holds your card and whose cards you hold, but can’t look at any card yet. Make deals.',
   },
-  { icon: 'lights', title: 'Lights', line: 'See every card but yours for a few seconds.' },
   { icon: 'talk', title: 'Talk', line: 'Keep 2 cards, or 1 with 4 or fewer. Tell the truth, or lie.' },
   { icon: 'chat', title: 'Private chat', line: 'Message any living player, only they see it. Any time but in your cell.' },
   { icon: 'cell', title: 'Cell', line: 'Name your own suit. Wrong means out.' },
@@ -210,7 +210,7 @@ const STEPS = [
   {
     icon: 'vote',
     title: 'Interrogation',
-    line: 'Once a game, in the 45 seconds, more than half of you can vote one player alone: nobody holds their card, they hold none, no lifeline.',
+    line: 'Once a game, in the 45 seconds, more than half of you can vote one player alone: their card is swapped for one nobody has seen, nobody holds it, no lifeline.',
   },
 ];
 

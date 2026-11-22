@@ -28,8 +28,8 @@ export default function DeadScreen({ state, game }) {
 function LightsIn({ state, game }) {
   const left = useSecondsLeft(state.phaseEndsAt, game.clockOffset) ?? 0;
   return (
-    <View style={styles.next} aria-label={`The lights come on in ${left} seconds`}>
-      <Text style={styles.nextText}>Turn {state.turn}: lights in</Text>
+    <View style={styles.next} aria-label={`The talk starts in ${left} seconds`}>
+      <Text style={styles.nextText}>Turn {state.turn}: cards in</Text>
       <Text style={styles.nextClock}>{clockText(left)}</Text>
     </View>
   );

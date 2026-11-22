@@ -21,8 +21,9 @@ export const RANKING_FROM = 5;
 export const MAX_CHOICES = 3;
 export const REVEAL_SECONDS = 8;
 /**
- * The briefing: right after choosing, before the lights. Everyone knows who holds their card and
- * whose cards they hold, but nobody sees a suit yet. Time to argue, make deals, and vote.
+ * The briefing: right after the lights, before the talk. Everyone has glimpsed every card but their
+ * own, and now learns who holds their card and whose cards they hold, but can't look at any card.
+ * Time to argue, make deals, and vote.
  */
 export const BRIEFING_SECONDS = 45;
 
@@ -35,7 +36,7 @@ export const CHAT_BURST = 5;
 export const CHAT_BURST_MS = 5000;
 
 // The phases after viewers have been assigned.
-// The phases after viewers have been assigned: from the briefing on, you know who holds whose card.
+// The phases after viewers have been assigned: you know who holds whose card from the briefing on.
 const VISION_PHASES = ['briefing', 'lights', 'discussion', 'confinement'];
 
 export const SETTING_LIMITS = {
@@ -72,9 +73,9 @@ export const SECRET_SWITCHES = { blackout: true, blackoutReveal: true };
  * the network layer calls these methods and decides when to call advance().
  *
  * A turn: choose (rank who you trust with your card)
- *       → briefing (45 s: who holds whose card, no suits; the interrogation vote)
- *       → lights (every card but yours, 3 or 5 s) → discussion (your 2 cards stay)
- *       → confinement (answer, lifeline) → reveal.
+ *       → lights (every card but yours, 3 or 5 s)
+ *       → briefing (45 s: who holds whose card, no card on screen; the interrogation vote)
+ *       → discussion (your 2 cards stay) → confinement (answer, lifeline) → reveal.
  * Living players can message each other privately the whole game, except in their cells.
  */
 export class Game {
@@ -368,10 +369,10 @@ export class Game {
   }
 
   /**
-   * Interrogation, after the cards were dealt: nobody holds that player's card any more, and they
-   * hold nobody's. The cards they would have held keep their other holder only. A fake that needed
-   * them (its card, or its fooled holder) is given back to the Jack; a blank card he no longer
-   * holds moves to the card he still does.
+   * Interrogation, after the lights: nobody holds that player's card any more, and they hold
+   * nobody's. The cards they would have held keep their other holder only. Everyone glimpsed their
+   * card in the lights, so it's swapped for a new one nobody has seen: they really are alone. A fake
+   * that needed them (its card, or its fooled holder) is given back to the Jack.
    */
   #isolate(id) {
     this.viewers.delete(id);
@@ -380,15 +381,15 @@ export class Game {
       if (entry.random === id) entry.random = null;
     }
     this.sees = cardsSeenBy(this.viewers);
+    const player = this.players.get(id);
+    if (player) player.suit = SUITS[this.#rng(SUITS.length)];
     if (this.fake?.viewerId && (this.fake.targetId === id || this.fake.viewerId === id)) {
       this.fakeLog = this.fakeLog.filter((f) => !(f.turn === this.turn && f.targetId === this.fake.targetId));
       this.fake = { targetId: this.fake.targetId, viewerId: null, suit: null };
       this.fakesLeft += 1;
     }
-    if (this.blankCardOf === id) {
-      const held = this.sees.get(this.jackId) ?? [];
-      this.blankCardOf = held.length ? held[this.#rng(held.length)] : null;
-    }
+    // The Jack saw his blank card blank in the lights; if he no longer holds it, nothing moves.
+    if (this.blankCardOf === id) this.blankCardOf = null;
   }
 
   /** The turn limit's turn: no lifelines, no blackout, and never the safe turn. */
@@ -503,11 +504,10 @@ export class Game {
   advance() {
     if (this.phase === 'choose') {
       this.#dealVision();
+    } else if (this.phase === 'lights') {
+      this.#enter('briefing', BRIEFING_SECONDS);
     } else if (this.phase === 'briefing') {
       this.#resolveVote();
-      const seated = this.seatedPlayers.length;
-      this.#enter('lights', seated <= SMALL_GAME ? LIGHTS_SECONDS_SMALL : LIGHTS_SECONDS);
-    } else if (this.phase === 'lights') {
       this.#enter('discussion', this.settings.discussionSeconds);
     } else if (this.phase === 'discussion') {
       this.#enter('confinement', this.settings.answerSeconds);
@@ -746,7 +746,7 @@ export class Game {
         this.fakesLeft += 1;
       }
     }
-    this.#enter('briefing', BRIEFING_SECONDS);
+    this.#enter('lights', ids.length <= SMALL_GAME ? LIGHTS_SECONDS_SMALL : LIGHTS_SECONDS);
   }
 
   #resolveTurn() {
