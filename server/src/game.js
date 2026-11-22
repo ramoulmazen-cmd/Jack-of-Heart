@@ -51,8 +51,11 @@ export const SETTING_LIMITS = {
   fakeSuits: { min: 0, max: 5, default: 2 },
 };
 
-/** On/off rules everyone can see. `interrogation`: once a game, the table can vote one player alone. */
-export const PUBLIC_SWITCHES = { interrogation: true };
+/**
+ * On/off rules everyone can see. `interrogation`: once a game, the table can vote one player alone.
+ * `safeTurn`: one secret turn (never the last) where nobody dies.
+ */
+export const PUBLIC_SWITCHES = { interrogation: true, safeTurn: true };
 
 const RED_SUITS = new Set(['hearts', 'diamonds']);
 
@@ -233,9 +236,10 @@ export class Game {
       throw new GameError('NOT_ENOUGH_PLAYERS', `You need at least ${MIN_PLAYERS} players.`);
     }
     this.jackId = ids[this.#rng(ids.length)];
-    // One secret turn in which collars are off. Nobody learns which until it's over. Never the
-    // last turn: with nobody dying on it, the turns would just run out and hand the Jack the game.
-    this.safeTurn = 1 + this.#rng(this.settings.maxTurns - 1);
+    // One secret turn in which collars are off, unless the host switched it off. Nobody learns which
+    // until it's over. Never the last turn: with nobody dying on it, the turns would just run out
+    // and hand the Jack the game.
+    this.safeTurn = this.settings.safeTurn ? 1 + this.#rng(this.settings.maxTurns - 1) : null;
     // The Jack's colour and blank turns: different turns, never the last. If there are more than
     // turns to hold them, colour turns come first and the rest are dropped.
     const turns = this.#shuffle(Array.from({ length: this.settings.maxTurns - 1 }, (_, i) => i + 1));

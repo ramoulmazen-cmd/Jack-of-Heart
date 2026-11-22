@@ -88,6 +88,9 @@ export function settingsSummary(settings) {
   if (typeof settings.interrogation === 'boolean') {
     rows.push({ label: 'interrogation', value: settings.interrogation ? 'With' : 'No' });
   }
+  if (typeof settings.safeTurn === 'boolean') {
+    rows.push({ label: 'safe turn', value: settings.safeTurn ? 'With' : 'No' });
+  }
   return rows;
 }
 
@@ -150,6 +153,12 @@ export function SettingsSheet({ visible, onClose, state, game }) {
         value={state.settings.interrogation !== false}
         onChange={(v) => run(() => game.updateSettings({ interrogation: v }))}
       />
+      <OnOff
+        label="Safe turn"
+        hint="One secret turn where nobody dies, never the last. Off: every turn counts."
+        value={state.settings.safeTurn !== false}
+        onChange={(v) => run(() => game.updateSettings({ safeTurn: v }))}
+      />
       {/* Only the host's phone is told these switches exist (the server leaves them out for everyone else). */}
       {typeof state.settings.blackout === 'boolean' ? (
         <>
@@ -187,7 +196,7 @@ const STEPS = [
   { icon: 'cell', title: 'Cell', line: 'Name your own suit. Wrong means out.' },
   { icon: 'jack', title: 'The Jack', line: 'One of you. When the Jack is out, everyone left wins.' },
   { icon: 'lifeline', title: 'Lifeline', line: 'In your cell, peek at your own card. Once a game, not on the last turn.' },
-  { icon: 'safe', title: 'Safe turn', line: 'One secret turn with the collars off. Never the last.' },
+  { icon: 'safe', title: 'Safe turn', line: 'One secret turn with the collars off, never the last. The host can switch it off.' },
   {
     icon: 'sight',
     title: 'The Jack’s bad turns',

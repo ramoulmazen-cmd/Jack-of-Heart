@@ -56,7 +56,7 @@ Recent Android versions don't let Termux read the phone's own network address. I
 
 **Private chat.** Tap **Chat** at the top of the screen (while choosing, in the 45 seconds, the talk and the cell) to message any living player. Only the two of you ever see a conversation, and nobody else's phone is even told that you're talking. It's open the whole game except in your cell (you can still read there), and the dead can't write. The number on **Chat** counts the messages you haven't read. A message is at most **10 words**; tap a ready-made phrase ("Your card is", "I trust you", "You lied to me" …) or a suit button to add it.
 
-The moment the Jack is out, everyone still in wins. The Jack wins by surviving until one other player is left, or until the turns run out. Once per game, in your cell, you can peek at your own card (Lifeline), except on the last turn. One secret turn has the collars off; it's never the last turn. Cards are dealt fresh every turn: repeats and streaks are normal.
+The moment the Jack is out, everyone still in wins. The Jack wins by surviving until one other player is left, or until the turns run out. Once per game, in your cell, you can peek at your own card (Lifeline), except on the last turn. One secret turn has the collars off; it's never the last turn, and the host can switch it off under **Settings → Safe turn** (then every turn counts). Cards are dealt fresh every turn: repeats and streaks are normal.
 
 **The Jack can't always see.** Everyone knows how many of these there are (the lobby shows the settings), but only the Jack learns which turns:
 
@@ -68,7 +68,7 @@ Holding **Role** (while choosing or in the talk) tells the Jack this turn's sigh
 
 **Interrogation vote** (on by default). Once a game, in the 45 seconds before the lights, more than half of the living players can vote one player into interrogation for the rest of that turn: nobody holds their card any more, they hold nobody's (those cards keep their other holder), their card is hidden in the lights, and they can't use their lifeline, so they guess their suit alone. Since everyone already knows who holds whose card, you can vote out the one you don't trust with yours. Tap a name to vote; the counts show, never who voted. The vote opens right after the first half of the game if nobody died in it (8 turns: from turn 5), otherwise 2 turns before the end (8 turns: turn 6), and only with more than 4 players left.
 
-The host sets all of these in **Settings**: colour turns, blank turns, fakes (0 turns each one off) and the interrogation vote on or off.
+The host sets all of these in **Settings**: colour turns, blank turns, fakes (0 turns each one off), and the interrogation vote and the safe turn on or off.
 
 House rules: never show your screen, no talking in the cell, the dead stay silent.
 
@@ -99,6 +99,7 @@ Under it, **Reveal it at the end** decides what the Game Over screen says. On (t
 ## Version 6.0
 
 - **The Jack can't always see.** Colour turns (red or black only), a blank turn (one held card blank) and fakes (a holder sees a false suit). A Jack who never lies used to win almost every game; now he has to say something on turns he can't see, and his mistakes point at him.
+- **The safe turn is a switch.** **Settings → Safe turn**, on by default and shown to everyone in the lobby; off, every turn is deadly.
 - **The 45 seconds moved to after choosing.** Every turn, the first too, now goes: choose → 45 seconds where you know who holds your card and whose cards you hold, but see no suit → lights → talk → cell. The countdown at the start of each turn is gone.
 - **Interrogation vote.** Once a game, in those 45 seconds, a majority can send one player into interrogation: nobody holds their card, they hold none, no lifeline.
 - **Host settings** for all of these, shown to everyone in the lobby.

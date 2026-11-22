@@ -1008,6 +1008,24 @@ test('a majority sends one player into interrogation: unseen, seeing nothing, no
   assert.equal(game.viewFor(host.id).interrogation.used, true);
 });
 
+test('the safe turn is a switch everyone can see; off, every turn is deadly', () => {
+  const { game, players, host } = setup(5);
+  assert.equal(game.viewFor(players[1].id).settings.safeTurn, true, 'on by default, and everyone knows');
+  assert.throws(() => game.updateSettings(players[1].id, { safeTurn: false }), { code: 'NOT_HOST' });
+  assert.throws(() => game.updateSettings(host.id, { safeTurn: 'no' }), { code: 'BAD_SETTINGS' });
+  game.start(host.id);
+  assert.ok(game.safeTurn >= 1 && game.safeTurn < game.settings.maxTurns, 'on: one turn, never the last');
+
+  const off = setup(5);
+  off.game.updateSettings(off.host.id, { safeTurn: false });
+  assert.equal(off.game.viewFor(off.players[2].id).settings.safeTurn, false);
+  off.game.start(off.host.id);
+  assert.equal(off.game.safeTurn, null, 'off: no safe turn at all');
+  const victim = off.game.alivePlayers.find((p) => p.id !== off.game.jackId);
+  playTurn(off.game, (p) => (p.id === victim.id ? wrongSuit(p.suit) : p.suit));
+  assert.equal(victim.alive, false, 'a wrong answer always kills');
+});
+
 test('only the host can close the room', () => {
   const { game, players, host } = setup(3);
   assert.throws(() => game.closeBy(players[1].id), { code: 'NOT_HOST' });
