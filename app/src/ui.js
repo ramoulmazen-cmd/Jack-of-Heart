@@ -202,9 +202,10 @@ export function TopBar({ state, game, title, action = null, clock = true }) {
           aria-label={action.label}
           onPress={action.onPress}
           hitSlop={8}
-          style={({ pressed }) => [styles.topAction, pressed && styles.buttonPressed]}
+          aria-selected={action.on ?? undefined}
+          style={({ pressed }) => [styles.topAction, action.on && styles.topActionOn, pressed && styles.buttonPressed]}
         >
-          <Text style={styles.topActionText}>{action.text}</Text>
+          <Text style={[styles.topActionText, action.on && styles.topActionTextOn]}>{action.text}</Text>
         </Pressable>
       ) : null}
       {clock ? <Countdown endsAt={state.phaseEndsAt} clockOffset={game.clockOffset} /> : null}
@@ -224,6 +225,24 @@ export function TopBar({ state, game, title, action = null, clock = true }) {
       ) : null}
     </View>
   );
+}
+
+/**
+ * The top bar's Skip, in Plotting and the talk: tap to want it over, tap again to take it back.
+ * It ends early only when every living player has tapped it, so it shows how many have.
+ */
+export function skipAction(state, game, run) {
+  const skip = state.skip;
+  if (!skip) return null;
+  const { count, needed, yours } = skip;
+  return {
+    text: `Skip ${count}/${needed}`,
+    on: yours,
+    label: yours
+      ? `You skipped, ${count} of ${needed}. Tap to take it back`
+      : `Skip, ${count} of ${needed}. It ends when everyone skips`,
+    onPress: () => run(() => game.skip(!yours)),
+  };
 }
 
 /** 0:45, 2:07: minutes and seconds, for clocks that should read as time. */
@@ -516,7 +535,9 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     marginRight: 12,
   },
-  topActionText: { color: color.paint, fontSize: 15, fontWeight: '800' },
+  topActionOn: { backgroundColor: color.paint },
+  topActionText: { color: color.paint, fontSize: 15, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  topActionTextOn: { color: color.ink },
   menu: { flexDirection: 'column', gap: 3, paddingHorizontal: 8, paddingVertical: 6, marginLeft: 8 },
   menuDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: color.faded },
   clock: { fontFamily: font.stencil, color: color.paint, fontVariant: ['tabular-nums'] },

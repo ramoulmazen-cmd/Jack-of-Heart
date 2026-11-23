@@ -41,10 +41,17 @@
         {
           "cameraPermission": "Take a photo for your player picture.",
           "photosPermission": "Choose a photo for your player picture.",
-          "microphonePermission": false
+          "microphonePermission": "Record voice messages for the private chat."
         }
       ],
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Record voice messages for the private chat.",
+          "enableBackgroundPlayback": false
+        }
+      ]
     ]
   }
 }

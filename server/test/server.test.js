@@ -40,6 +40,11 @@ function player() {
 
 const call = (client, event, payload = {}) => client.socket.timeout(2000).emitWithAck(event, payload);
 
+/** Everyone presses Skip, one after another: the talk ends with the last one. */
+async function skipAll(clients) {
+  for (const c of clients) assert.equal((await call(c, 'game:skip')).ok, true);
+}
+
 function waitFor(client, matches, ms = 4000) {
   if (client.state && matches(client.state)) return Promise.resolve(client.state);
   return new Promise((resolve, reject) => {
@@ -145,7 +150,14 @@ test('a full game over real sockets: ranked choices, the glimpse, your 2 cards, 
   assert.equal((await call(peeker, 'turn:lifeline')).error, 'WRONG_PHASE', 'no lifeline during the talk');
 
   // Everyone honest: nobody dies. In the cell, the lifeline answers only the caller, once.
+  // One Skip isn't enough: the talk goes on until every living player has pressed it.
   assert.equal((await call(host, 'game:skip')).ok, true);
+  const counted = await waitFor(peeker, (s) => s.skip?.count === 1);
+  assert.equal(counted.phase, 'discussion');
+  assert.deepEqual(counted.skip, { count: 1, needed: everyone.length, yours: false });
+  assert.equal((await call(host, 'game:skip', { skip: false })).ok, true, 'and you can take it back');
+  await waitFor(peeker, (s) => s.skip?.count === 0);
+  await skipAll(everyone);
   await Promise.all(everyone.map((c) => waitFor(c, (s) => s.phase === 'confinement')));
   const peek = await call(peeker, 'turn:lifeline');
   assert.deepEqual(peek, { ok: true, suit: truth.get(peeker.id) });
@@ -192,7 +204,7 @@ test('a full game over real sockets: ranked choices, the glimpse, your 2 cards, 
   });
 
   // In the cell: an untouched lifeline fails and is lost; the Jack's works.
-  await call(host, 'game:skip');
+  await skipAll(active);
   await Promise.all(active.map((c) => waitFor(c, (s) => s.phase === 'confinement' && s.turn === 2)));
   const victim = active.find((c) => c !== jack && c.id !== peeker.id);
   assert.deepEqual(await call(victim, 'turn:lifeline'), { ok: true, blackout: true });

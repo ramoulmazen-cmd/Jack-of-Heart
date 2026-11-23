@@ -1,6 +1,7 @@
 import { randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import { GameError } from './errors.js';
 import { decodePhoto } from './photos.js';
+import { VOICE_MAX_SECONDS, VOICE_PER_TALK, decodeVoice, voiceDataUrl } from './voice.js';
 import { MAX_CHOSEN, assignViewers, cardsSeenBy, otherViewer, pairViewers, resolveChoices } from './viewers.js';
 
 export { GameError };
@@ -37,6 +38,8 @@ export const CHAT_BURST_MS = 5000;
 
 // The phases after viewers have been assigned: from the lights on, you know who holds whose card.
 const VISION_PHASES = ['briefing', 'lights', 'discussion', 'confinement'];
+// The phases the table can cut short together: Plotting (the briefing) and the talk.
+export const SKIP_PHASES = ['briefing', 'discussion'];
 
 export const SETTING_LIMITS = {
   briefingSeconds: { min: 10, max: 180, default: BRIEFING_SECONDS }, // plotting, before the talk
@@ -54,9 +57,10 @@ export const SETTING_LIMITS = {
 
 /**
  * On/off rules everyone can see. `interrogation`: once a game, the table can vote one player alone.
- * `safeTurn`: one secret turn (never the last) where nobody dies.
+ * `safeTurn`: one secret turn (never the last) where nobody dies. `voiceChat`: voice messages in
+ * the private chat, during the talk only; off by default, since in one room everyone would hear them.
  */
-export const PUBLIC_SWITCHES = { interrogation: true, safeTurn: true };
+export const PUBLIC_SWITCHES = { interrogation: true, safeTurn: true, voiceChat: false };
 
 const RED_SUITS = new Set(['hearts', 'diamonds']);
 
@@ -433,10 +437,23 @@ export class Game {
     this.blackoutTurn = this.turn;
   }
 
-  skipDiscussion(byId) {
-    this.#requireHost(byId);
-    this.#requirePhase('discussion', 'Discussion is not running.');
-    this.advance();
+  /**
+   * Skip, in Plotting or the talk: `on` adds your vote to end it now, false takes it back. Nothing
+   * happens until every living player has pressed it (`everyoneSkipped`); then the phase ends.
+   */
+  skip(playerId, on = true) {
+    const player = this.players.get(playerId);
+    if (!player?.alive || player.left) throw new GameError('NOT_ALIVE', 'Only living players can skip.');
+    if (!SKIP_PHASES.includes(this.phase)) {
+      throw new GameError('WRONG_PHASE', 'You can only skip Plotting or the talk.');
+    }
+    if (on) this.skips.add(playerId);
+    else this.skips.delete(playerId);
+  }
+
+  get everyoneSkipped() {
+    const active = this.activePlayers;
+    return SKIP_PHASES.includes(this.phase) && active.length > 0 && active.every((p) => this.skips.has(p.id));
   }
 
   /**
@@ -457,6 +474,57 @@ export class Game {
    * phones can't even tell that two players are talking.
    */
   sendMessage(fromId, toId, rawText) {
+    this.#checkChat(fromId, toId);
+    const text = cleanMessage(rawText);
+    this.#throttle(fromId);
+    return this.#store({ from: fromId, to: toId, text });
+  }
+
+  /**
+   * A voice message: during the talk only, if the host switched them on, at most
+   * VOICE_MAX_SECONDS long, VOICE_PER_TALK of them per player per talk. The message keeps
+   * `voice: { seconds, type }`; the clip itself stays in memory only until the talk ends.
+   */
+  sendVoice(fromId, toId, dataUrl, rawSeconds) {
+    if (!this.settings.voiceChat) throw new GameError('VOICE_OFF', 'Voice messages are off in this room.');
+    this.#checkChat(fromId, toId);
+    if (this.phase !== 'discussion') throw new GameError('VOICE_CLOSED', 'Voice messages are only for the talk.');
+    const seconds = Number(rawSeconds);
+    if (!Number.isFinite(seconds) || seconds <= 0 || seconds > VOICE_MAX_SECONDS + 1) {
+      throw new GameError('BAD_VOICE', `Voice messages are ${VOICE_MAX_SECONDS} seconds at most.`);
+    }
+    const sent = this.voiceSent.get(fromId) ?? 0;
+    if (sent >= VOICE_PER_TALK) {
+      throw new GameError('TOO_MANY_VOICE', `That’s ${VOICE_PER_TALK} voice messages this talk. Write instead.`);
+    }
+    const clip = decodeVoice(dataUrl);
+    this.#throttle(fromId);
+    this.voiceSent.set(fromId, sent + 1);
+    const voice = { seconds: Math.max(1, Math.min(VOICE_MAX_SECONDS, Math.round(seconds))), type: clip.type };
+    const message = this.#store({ from: fromId, to: toId, text: '', voice });
+    this.voiceClips.set(message.id, clip);
+    return message;
+  }
+
+  /** A voice message's clip, as a data URL, while the talk it was sent in lasts; else null. */
+  voiceDataOf(messageId) {
+    const clip = this.voiceClips.get(messageId);
+    return clip ? voiceDataUrl(clip) : null;
+  }
+
+  /** Every message you sent or received this game, oldest first. Nobody else's. */
+  chatFor(playerId) {
+    const mine = [];
+    for (const thread of this.chats.values()) {
+      if (thread[0] && (thread[0].from === playerId || thread[0].to === playerId)) mine.push(...thread);
+    }
+    return mine
+      .sort((a, b) => a.id - b.id)
+      .map((m) => (m.voice && this.voiceClips.has(m.id) ? { ...m, voice: { ...m.voice, data: this.voiceDataOf(m.id) } } : m));
+  }
+
+  /** Who can write to whom: both alive and in the game, never yourself, never from the cell. */
+  #checkChat(fromId, toId) {
     const from = this.players.get(fromId);
     const closed = this.chatClosedFor(from);
     if (closed === 'gone') throw new GameError('NOT_IN_ROOM', 'You are not in this room.');
@@ -467,28 +535,28 @@ export class Game {
     const to = typeof toId === 'string' ? this.players.get(toId) : undefined;
     if (!to || to.left) throw new GameError('BAD_TARGET', 'That player is not in the game.');
     if (!to.alive) throw new GameError('BAD_TARGET', `${to.name} is out, and the dead stay silent.`);
-    const text = cleanMessage(rawText);
+  }
+
+  /** At most CHAT_BURST messages, text or voice, in CHAT_BURST_MS. */
+  #throttle(fromId) {
     const now = this.#clock();
     const recent = (this.chatTimes.get(fromId) ?? []).filter((at) => now - at < CHAT_BURST_MS);
     if (recent.length >= CHAT_BURST) throw new GameError('TOO_FAST', 'Slow down a little.');
     this.chatTimes.set(fromId, [...recent, now]);
-    this.chatCount += 1;
-    const message = { id: this.chatCount, from: fromId, to: toId, text, at: now, turn: this.turn };
-    const key = [fromId, toId].sort().join(':');
-    const thread = this.chats.get(key) ?? [];
-    thread.push(message);
-    if (thread.length > CHAT_HISTORY) thread.shift();
-    this.chats.set(key, thread);
-    return message;
   }
 
-  /** Every message you sent or received this game, oldest first. Nobody else's. */
-  chatFor(playerId) {
-    const mine = [];
-    for (const thread of this.chats.values()) {
-      if (thread[0] && (thread[0].from === playerId || thread[0].to === playerId)) mine.push(...thread);
+  #store(fields) {
+    this.chatCount += 1;
+    const message = { id: this.chatCount, ...fields, at: this.#clock(), turn: this.turn };
+    const key = [fields.from, fields.to].sort().join(':');
+    const thread = this.chats.get(key) ?? [];
+    thread.push(message);
+    if (thread.length > CHAT_HISTORY) {
+      const dropped = thread.shift();
+      this.voiceClips.delete(dropped.id);
     }
-    return mine.sort((a, b) => a.id - b.id);
+    this.chats.set(key, thread);
+    return message;
   }
 
   answer(playerId, suit) {
@@ -594,6 +662,14 @@ export class Game {
             interrogated: isolated,
             ...blackout,
             ...powers,
+          }
+        : null,
+      // Skip: how many living players want to end Plotting or the talk now, out of how many.
+      skip: SKIP_PHASES.includes(this.phase)
+        ? {
+            count: this.activePlayers.filter((p) => this.skips.has(p.id)).length,
+            needed: this.activePlayers.length,
+            yours: this.skips.has(viewerId),
           }
         : null,
       // The vote: how many votes each player has (never who cast them), and your own.
@@ -779,6 +855,10 @@ export class Game {
 
   #enter(phase, seconds) {
     this.phase = phase;
+    this.skips = new Set();
+    // Voice clips live only through the talk they were sent in: the server forgets them after.
+    this.voiceClips = new Map();
+    this.voiceSent = new Map();
     this.phaseEndsAt = seconds === null ? null : this.#clock() + seconds * 1000 * this.#timeScale;
   }
 
@@ -786,6 +866,7 @@ export class Game {
     this.phase = 'lobby';
     this.turn = 0;
     this.phaseEndsAt = null;
+    this.skips = new Set(); // who pressed Skip in this Plotting or talk
     this.jackId = null;
     this.safeTurn = null;
     this.safeResults = new Map();
@@ -813,6 +894,8 @@ export class Game {
     this.chats = new Map();
     this.chatCount = 0;
     this.chatTimes = new Map();
+    this.voiceClips = new Map(); // message id → { type, bytes }, for the current talk only
+    this.voiceSent = new Map(); // player id → voice messages sent this talk
     for (const p of this.players.values()) {
       Object.assign(p, { alive: true, suit: null, answer: null, diedOnTurn: null, lifelineUsed: false });
     }

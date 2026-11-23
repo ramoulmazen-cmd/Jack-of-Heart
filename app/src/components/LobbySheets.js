@@ -98,6 +98,9 @@ export function settingsSummary(settings) {
   if (typeof settings.safeTurn === 'boolean') {
     rows.push({ label: 'safe turn', value: settings.safeTurn ? 'With' : 'No' });
   }
+  if (typeof settings.voiceChat === 'boolean') {
+    rows.push({ label: 'voice messages', value: settings.voiceChat ? 'With' : 'No' });
+  }
   return rows;
 }
 
@@ -165,6 +168,12 @@ export function SettingsSheet({ visible, onClose, state, game }) {
         hint="One secret turn where nobody dies, never the last. Off: every turn counts."
         value={state.settings.safeTurn !== false}
         onChange={(v) => run(() => game.updateSettings({ safeTurn: v }))}
+      />
+      <OnOff
+        label="Voice messages"
+        hint="In the private chat, during the talk only, up to 20 s each. On when you play apart; off in one room, where everyone would hear."
+        value={state.settings.voiceChat === true}
+        onChange={(v) => run(() => game.updateSettings({ voiceChat: v }))}
       />
       {/* Only the host's phone is told these switches exist (the server leaves them out for everyone else). */}
       {typeof state.settings.blackout === 'boolean' ? (

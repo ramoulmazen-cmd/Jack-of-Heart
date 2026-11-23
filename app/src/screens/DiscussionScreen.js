@@ -9,11 +9,10 @@ import { Interrogated, InterrogationNote } from '../components/Interrogation';
 import { RoleOverlay } from '../components/Role';
 import { NotesSheet, WhoToldYou } from '../NotesViews';
 import { color } from '../theme';
-import { ErrorText, Screen, TopBar, useAction } from '../ui';
+import { ErrorText, Screen, TopBar, skipAction, useAction } from '../ui';
 
 export default function DiscussionScreen({ state, game, notes }) {
   const { you } = state;
-  const isHost = state.hostId === you.id;
   const [held, setHeld] = useState(null);
   const [showRole, setShowRole] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
@@ -58,12 +57,7 @@ export default function DiscussionScreen({ state, game, notes }) {
       footer={footer}
       overlay={showRole ? <RoleOverlay state={state} onArm={game.blackout} canArm /> : null}
     >
-      <TopBar
-        state={state}
-        game={game}
-        title="Talk"
-        action={isHost ? { text: 'Skip', label: 'Send everyone to their cells now', onPress: () => run(game.skip) } : null}
-      />
+      <TopBar state={state} game={game} title="Talk" action={skipAction(state, game, run)} />
       <PlayerStrip state={state} />
 
       {you.interrogated ? <Interrogated state={state} /> : <InterrogationNote state={state} />}

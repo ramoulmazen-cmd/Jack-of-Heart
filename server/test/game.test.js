@@ -149,7 +149,6 @@ test('the briefing: 45 seconds after the lights where you know who holds whose c
     assert.throws(() => game.choose(a.id, [b.id]), { code: 'WRONG_PHASE' });
     assert.throws(() => game.answer(a.id, 'hearts'), { code: 'WRONG_PHASE' });
     assert.throws(() => game.useLifeline(a.id), { code: 'WRONG_PHASE' });
-    assert.throws(() => game.skipDiscussion(host.id), { code: 'WRONG_PHASE' });
     game.advance();
     assert.equal(game.phase, 'discussion', 'then the talk, where you can hold your cards');
     playTurn(game);
@@ -1122,6 +1121,92 @@ test('Game Over reveals the Jack’s colour and blank turns that were played, an
   playTurn(early.game, (p) => (p.id === early.game.jackId ? wrongSuit(p.suit) : p.suit)); // the Jack dies on turn 1
   early.game.advance();
   assert.deepEqual(early.game.viewFor(early.host.id).result.jackTurns.blank, []);
+});
+
+test('Skip: Plotting and the talk end early only when every living player has pressed it', () => {
+  const { game, host, players } = setup(5);
+  start(game, host);
+  const [a, b] = players;
+  assert.throws(() => game.skip(a.id), { code: 'WRONG_PHASE' }, 'not while choosing');
+  toLights(game);
+  assert.throws(() => game.skip(a.id), { code: 'WRONG_PHASE' }, 'not in the lights');
+  game.advance(); // Plotting
+
+  // Plotting: the count goes up, and it doesn't end until the last one.
+  for (const p of players.slice(0, -1)) game.skip(p.id);
+  assert.equal(game.everyoneSkipped, false);
+  assert.deepEqual(game.viewFor(a.id).skip, { count: 4, needed: 5, yours: true });
+  assert.deepEqual(game.viewFor(players[4].id).skip, { count: 4, needed: 5, yours: false });
+  game.skip(a.id, false); // taken back
+  assert.equal(game.viewFor(b.id).skip.count, 3);
+  game.skip(a.id);
+  game.skip(players[4].id);
+  assert.equal(game.everyoneSkipped, true);
+  game.advance();
+  assert.equal(game.phase, 'discussion');
+  assert.deepEqual(game.viewFor(a.id).skip, { count: 0, needed: 5, yours: false }, 'every phase starts with no skips');
+
+  // The talk: someone who left doesn't hold it up.
+  game.leave(players[4].id);
+  for (const p of players.slice(0, 4)) game.skip(p.id);
+  assert.equal(game.everyoneSkipped, true, 'the 4 still playing are enough');
+  assert.throws(() => game.skip(players[4].id), { code: 'NOT_ALIVE' }, 'someone who left can’t skip');
+  game.advance();
+  assert.equal(game.phase, 'confinement');
+  assert.equal(game.viewFor(a.id).skip, null, 'no Skip in the cell');
+  assert.throws(() => game.skip(a.id), { code: 'WRONG_PHASE' });
+});
+
+/** A tiny file that starts like an iPhone/app recording (an MP4 "ftyp" box). */
+const fakeClip = (bytes = 64) => {
+  const buf = Buffer.alloc(bytes);
+  buf.write('ftypM4A ', 4, 'latin1');
+  return `data:audio/mp4;base64,${buf.toString('base64')}`;
+};
+
+test('voice messages: only if the host turns them on, only in the talk, 20 s at most', () => {
+  const { game, host } = setup(5);
+  const [a, b] = game.players.values();
+  assert.equal(game.settings.voiceChat, false, 'off by default: in one room everyone would hear them');
+  start(game, host);
+  toTalk(game);
+  assert.throws(() => game.sendVoice(a.id, b.id, fakeClip(), 5), { code: 'VOICE_OFF' });
+
+  const on = setup(5);
+  on.game.updateSettings(on.host.id, { voiceChat: true });
+  assert.equal(on.game.viewFor(on.players[3].id).settings.voiceChat, true, 'everyone sees the switch');
+  start(on.game, on.host);
+  const [x, y, z] = on.players;
+  toBriefing(on.game);
+  assert.throws(() => on.game.sendVoice(x.id, y.id, fakeClip(), 5), { code: 'VOICE_CLOSED' }, 'not in Plotting');
+  on.game.advance(); // the talk
+  assert.throws(() => on.game.sendVoice(x.id, y.id, fakeClip(), 25), { code: 'BAD_VOICE' }, 'longer than 20 s');
+  assert.throws(() => on.game.sendVoice(x.id, y.id, 'data:audio/mp4;base64,PHNjcmlwdD4=', 5), { code: 'BAD_VOICE' });
+  assert.throws(() => on.game.sendVoice(x.id, y.id, 'data:text/html;base64,PGI+', 5), { code: 'BAD_VOICE' });
+  assert.throws(() => on.game.sendVoice(x.id, x.id, fakeClip(), 5), { code: 'BAD_TARGET' });
+
+  const sent = on.game.sendVoice(x.id, y.id, fakeClip(), 7.4);
+  assert.deepEqual(sent.voice, { seconds: 7, type: 'audio/mp4' });
+  assert.equal(sent.text, '');
+  const forY = on.game.chatFor(y.id).find((m) => m.id === sent.id);
+  assert.equal(forY.voice.data, fakeClip(), 'the receiver gets the clip back after a reconnect');
+  assert.equal(on.game.chatFor(z.id).length, 0, 'nobody else');
+  assert.ok(!JSON.stringify(on.game.viewFor(z.id)).includes('ftyp'), 'and it is never in anyone’s state');
+
+  // 10 a talk, each one counted by the chat's speed limit too.
+  for (let i = 1; i < 10; i += 1) {
+    on.tick(CHAT_BURST_MS);
+    on.game.sendVoice(x.id, y.id, fakeClip(), 3);
+  }
+  on.tick(CHAT_BURST_MS);
+  assert.throws(() => on.game.sendVoice(x.id, y.id, fakeClip(), 3), { code: 'TOO_MANY_VOICE' });
+
+  // When the talk ends the server forgets the clips; the messages stay, marked as voice.
+  on.game.advance(); // the cell
+  const after = on.game.chatFor(y.id).find((m) => m.id === sent.id);
+  assert.deepEqual(after.voice, { seconds: 7, type: 'audio/mp4' });
+  assert.equal(on.game.voiceClips.size, 0);
+  assert.throws(() => on.game.sendVoice(x.id, y.id, fakeClip(), 3), { code: 'CHAT_CLOSED' }, 'no talking in the cell');
 });
 
 test('a private message is at most 10 words; a suit symbol counts as one', () => {

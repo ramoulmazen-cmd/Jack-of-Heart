@@ -6,7 +6,7 @@ import { HoldButton } from '../components/HoldButton';
 import { RoleOverlay } from '../components/Role';
 import { color, font } from '../theme';
 import { useChatContext } from '../useChat';
-import { Button, Card, ErrorText, Screen, TopBar, clockText, useAction, useSecondsLeft, viewersOf } from '../ui';
+import { Button, Card, ErrorText, Screen, TopBar, clockText, skipAction, useAction, useSecondsLeft, viewersOf } from '../ui';
 
 /**
  * The 45 seconds right after the lights, before the talk. Everyone glimpsed every card; now you
@@ -48,7 +48,7 @@ export default function BriefingScreen({ state, game }) {
 
   return (
     <Screen footer={footer} overlay={showRole ? <RoleOverlay state={state} /> : null}>
-      <TopBar state={state} game={game} title="Plotting" clock={false} />
+      <TopBar state={state} game={game} title="Plotting" clock={false} action={skipAction(state, game, run)} />
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         <View style={styles.clockBlock} aria-label={`Your cards come in ${left} seconds`}>
           <Text style={styles.until}>Your cards in</Text>

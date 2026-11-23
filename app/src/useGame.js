@@ -214,11 +214,14 @@ export function useGame() {
     blackout: () => request('turn:blackout'),
     // The Jack, while choosing: one holder of `target`'s card will see a false suit on it.
     fake: (target) => request('turn:fake', { target }),
-    // The interrogation vote, during the countdown; null takes your vote back.
+    // The interrogation vote, during Plotting; null takes your vote back.
     vote: (target) => request('turn:vote', { target }),
-    skip: () => request('game:skip'),
+    // Skip Plotting or the talk; false takes it back. It ends once every living player has skipped.
+    skip: (on = true) => request('game:skip', { skip: on }),
     answer: (suit) => request('turn:answer', { suit }),
     sendMessage: async (to, text) => (await request('chat:send', { to, text })).message,
+    // A voice message, in the talk, if the host switched them on: `audio` is a data URL.
+    sendVoice: async (to, audio, seconds) => (await request('chat:voice', { to, audio, seconds })).message,
     chatHistory,
     onChatMessage,
     updateSettings: (changes) => request('game:settings', changes),

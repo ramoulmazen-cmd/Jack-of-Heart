@@ -51,10 +51,14 @@ Recent Android versions don't let Termux read the phone's own network address. I
 2. **Lights (5 s, or 3 s with 5 or fewer players).** Every card but yours shows on screen, with nothing to hold.
 3. **Plotting (45 s; the host can set 15 to 90 s).** A big clock on every phone. You now know who holds your card and whose cards you'll hold, with the other person who holds each one ("also seen by"), but you can't look at any card yet: only your memory of the lights. Argue about the last result, make deals, set traps. If the interrogation vote is open, this is when it happens.
 4. **Talk.** Hold one of your cards to look at it again; under each one, "also seen by" names the other person who holds it (with 4 or fewer players, nobody else does). Note what your viewers tell you. Trade, promise, lie.
+
+   **Skip.** In Plotting and the talk, everyone has **Skip** at the top (it shows how many have tapped it, e.g. "Skip 3/5"; tap again to take yours back). The phase ends early only when every living player has tapped it. Nobody can skip alone, not even the host.
 5. **Cell.** Your notes are on screen. Pick your own suit. Wrong, or no answer, and you're out. This is the only place your lifeline works, and it doesn't on the last turn.
 6. **Results.** ALIVE, DEAD or SAFE in the middle of the screen; everyone's mugshot shows who's still in.
 
 **Private chat.** Tap **Chat** at the top of the screen (while choosing, in Plotting, the talk and the cell) to message any living player. Only the two of you ever see a conversation, and nobody else's phone is even told that you're talking. It's open the whole game except in your cell (you can still read there), and the dead can't write. The number on **Chat** counts the messages you haven't read. A message is at most **10 words**; tap a ready-made phrase ("Your card is", "I trust you", "You lied to me" …) or a suit button to add it.
+
+**Voice messages** (off by default; the host switches them on under **Settings → Voice messages**, for games played apart: in one room everyone would hear them). Only during the talk: with the message box empty, **Voice** takes the place of Send. Tap it, talk, then **Send**, or **Cancel**; at 20 seconds it stops and sends by itself. A voice message goes to that one player only, like a text, and counts toward the same speed limit, with at most 10 per player per talk. The server keeps a clip only until the talk ends; your phone keeps the ones it got, so you can still play them in your cell. On the website the microphone works only on the secure (https) address, not on a Wi-Fi address like `192.168…:3000`.
 
 The moment the Jack is out, everyone still in wins. The Jack wins by surviving until one other player is left, or until the turns run out. Once per game, in your cell, you can peek at your own card (Lifeline), except on the last turn. One secret turn has the collars off; it's never the last turn, and the host can switch it off under **Settings → Safe turn** (then every turn counts). Cards are dealt fresh every turn: repeats and streaks are normal.
 
@@ -68,7 +72,7 @@ Holding **Role** (while choosing, in Plotting or in the talk) tells the Jack thi
 
 **Interrogation vote** (on by default). Once a game, in Plotting, right after the lights, more than half of the living players can vote one player into interrogation for the rest of that turn: everyone glimpsed their card in the lights, so it's swapped for a new one nobody has seen; nobody holds it, they hold nobody's (those cards keep their other holder), and they can't use their lifeline, so they guess their suit alone. Since everyone already knows who holds whose card, you can vote out the one you don't trust with yours. Tap a name to vote; the counts show, never who voted. The vote opens right after the first half of the game if nobody died in it (8 turns: from turn 5), otherwise 2 turns before the end (8 turns: turn 6), and only with more than 4 players left.
 
-The host sets all of these in **Settings**: how long Plotting lasts, colour turns, blank turns, fakes (0 turns each one off), and the interrogation vote and the safe turn on or off.
+The host sets all of these in **Settings**: how long Plotting lasts, colour turns, blank turns, fakes (0 turns each one off), and the interrogation vote, the safe turn and voice messages on or off.
 
 **How to play** (in the lobby, and in the ⋯ menu during a game) shows all this as slides: one idea a page, a still picture made of the game's own cards and buttons, and When / How / Then for every power. The times and counts on the slides are the room's own settings.
 
@@ -114,6 +118,8 @@ Under it, **Reveal it at the end** decides what the Game Over screen says. On (t
 - **Nobody waits for someone who left.** If the last player everyone was waiting for leaves while choosing or in the cell, the turn goes on at once.
 - **Game Over reveals the Jack's secrets**: his colour and blank turns, and every fake (who saw what, and what it really was).
 - **The Jack isn't told what his fake shows.** Role says only "You faked Sara's card: Omar gets a false suit.", never the suit Omar sees.
+- **Voice messages in the private chat**, a host switch (off by default): during the talk only, up to 20 seconds, to one player only. In the browser they're recorded as MP4 (AAC) when the browser can, which every phone plays; Firefox records Ogg, which an iPhone may not play. The app needs a new build for it (microphone permission, `expo-audio`).
+- **Everyone skips together.** Skip used to be the host's alone, in the talk. Now every living player has it, in Plotting and in the talk, and the phase ends only when all of them have tapped it.
 - **"also seen by"** under each card you hold names the other holder, and stays on one line with long names.
 - **How to play is slides**, with Back and Next and nothing animated, so it costs a phone nothing. Every power says when and how to use it, with the room's own times and counts. The blackout page shows only on the host's phone and the Jack's, so it stays a surprise for everyone else.
 - **The first card flip shows its suit at once.** The suit pictures load when the game opens; in the browser the very first flip of a game used to show an empty face for a moment.
@@ -268,7 +274,7 @@ Every function takes the random number generator as a parameter. The game passes
 ### A state machine with timers owned by the server
 
 ```
-lobby ─start─▶ choose ─20 s or all locked in─▶ lights ─3 or 5 s─▶ briefing ─45 s─▶ discussion ─timer or host─▶ confinement
+lobby ─start─▶ choose ─20 s or all locked in─▶ lights ─3 or 5 s─▶ briefing ─45 s─▶ discussion ─timer or skip─▶ confinement
                   ▲                                                                                                   │
                   │                                                                                 timer or all answered
                   │                                                                                                   ▼
@@ -277,7 +283,7 @@ lobby ─start─▶ choose ─20 s or all locked in─▶ lights ─3 or 5 s─
                                                                                                 winner decided ─▶ over
 ```
 
-Every turn starts with choosing. From the lights on the viewers are assigned, so each phone gets `you.viewers`, `you.sees` and `you.sharedWith`; in the `briefing` no suit is sent at all. Players see the briefing as **Plotting**; it lasts `settings.briefingSeconds` (45 by default, 10 to 180). The interrogation vote, if open, is decided when the briefing ends.
+Every turn starts with choosing. From the lights on the viewers are assigned, so each phone gets `you.viewers`, `you.sees` and `you.sharedWith`; in the `briefing` no suit is sent at all. Players see the briefing as **Plotting**; it lasts `settings.briefingSeconds` (45 by default, 10 to 180). The briefing and the discussion also end early once every active player has skipped (`state.skip`: `{ count, needed, yours }`, null in the other phases). The interrogation vote, if open, is decided when the briefing ends.
 
 Each room has one `setTimeout` that fires when the current phase ends and calls `game.advance()`. The server sends `phaseEndsAt`, a timestamp, rather than "seconds left", so a message that arrives late still shows the right countdown. Phone clocks can be off by seconds or minutes, so every state also carries `serverNow`. The app keeps `offset = serverNow - Date.now()` and counts down against server time.
 
@@ -376,7 +382,7 @@ The art is SVG source in `app/assets/art/`, rendered once to PNG, so the app nev
 | `room:resume` | `{ code, playerId, token }` | the same player after a reconnect |
 | `room:leave` | — | a player (mid-game, your collar goes off at the end of the turn) |
 | `room:close` | — | host; every other phone gets `closed` and goes back to the start |
-| `game:settings` | `{ briefingSeconds?, discussionSeconds?, answerSeconds?, maxTurns?, colorTurns?, blankTurns?, fakeSuits?, interrogation?, safeTurn?, blackout?, blackoutReveal? }` | host, in the lobby |
+| `game:settings` | `{ briefingSeconds?, discussionSeconds?, answerSeconds?, maxTurns?, colorTurns?, blankTurns?, fakeSuits?, interrogation?, safeTurn?, voiceChat?, blackout?, blackoutReveal? }` | host, in the lobby |
 | `game:kick` | `{ playerId }` | host, in the lobby |
 | `game:start` | — | host, in the lobby, 3+ players |
 | `turn:choose` | `{ ranking: [playerId, …] }` | living player, during choose, once per turn; best choice first |
@@ -384,12 +390,13 @@ The art is SVG source in `app/assets/art/`, rendered once to PNG, so the app nev
 | `turn:vote` | `{ target: playerId \| null }` | living player, in the briefing while the interrogation vote is open; `null` takes your vote back |
 | `turn:lifeline` | — | living player, in the cell, once per game, before answering, not on the last turn; replies `{ suit }`, or `{ blackout: true }` during a blackout |
 | `turn:blackout` | — | the Jack, during the talk, once per game, not on the last turn, if the host left it on |
-| `game:skip` | — | host, during discussion |
+| `game:skip` | `{ skip? }`: `false` takes yours back | living player, in the briefing or the talk; the phase ends when every living player has skipped |
 | `turn:answer` | `{ suit }` | living player, in the cell, once per turn |
 | `game:reset` | — | host, after the game |
 | `player:photo` | `{ photo }`: a `data:image/jpeg;base64,…` URL, or `null` to remove it | any player in a room, any time |
 | `chat:send` | `{ to: playerId, text }` | a living player to another, from the start of the game, never in the cell; replies `{ message }` |
-| `chat:history` | — | any player in a room; replies `{ gameNumber, messages }`, only your own conversations |
+| `chat:voice` | `{ to: playerId, audio, seconds }`: `audio` a `data:audio/mp4\|webm\|ogg;base64,…` URL, at most 480 KB, `seconds` at most 20 | a living player to another, in the talk, if `settings.voiceChat`; at most 10 a talk; replies `{ message }` (with `voice: { seconds, type }`), and the receiver gets `chat:message` with `voice.data` |
+| `chat:history` | — | any player in a room; replies `{ gameNumber, messages }`, only your own conversations; a voice message carries its clip (`voice.data`) only until its talk ends |
 
 Every reply is `{ ok: true, ... }` or `{ ok: false, error: 'CODE', message }`. The server sends `state` (that player's own view, plus `joinUrl`, the address other phones should open) after every change, `kicked` to a removed player, `closed` to every other phone when the host closes the room, and `chat:message` (`{ id, from, to, text, at, turn }`) to the one player a message is for. `phase` is one of `lobby`, `cooldown`, `choose`, `lights`, `discussion`, `confinement`, `reveal`, `over`. `you.chatClosed` says why you can't write right now (`'lobby'`, `'cell'` or `'dead'`), or is `null`. `lastTurn` is true on the turn limit's turn. A few fields exist in some states only: `you.blackout` (`'ready'`, `'on'` or `'used'`, or `null` on the last turn if unused) in the Jack's, `settings.blackout` and `settings.blackoutReveal` in the host's, and `result.blackout` (`{ turn }`, or `null` if the host chose not to reveal it) in everyone's once the game is over.
 
@@ -401,13 +408,13 @@ Plain HTTP routes: `GET /` serves the built web app, `GET /photo/:code/:playerId
 npm test
 ```
 
-The suite has 52 tests:
+The suite has 73 tests:
 
-- the rules engine on its own: the turn flow and its clocks (3 or 5 seconds of lights, the 45-second briefing after the lights, in which you know who holds whose card but see no card), ranked choices and their limits, first come first served, exactly 2 and 2 (1 and 1 with 4 or fewer), what each phase reveals, who else holds your cards, fair dealing over 4,000 turns, the lifeline (cell only, never on the last turn), the safe turn (any turn but the last), win conditions, deaths, players who leave, host hand-over, game numbers, and that no view ever contains your own card or anyone's token;
+- the rules engine on its own: the turn flow and its clocks (3 or 5 seconds of lights, the briefing (Plotting) after the lights, 45 seconds or the host's setting, in which you know who holds whose card but see no card), Skip (only in Plotting and the talk, only when every living player has skipped, taken back, players who left not counted), ranked choices and their limits, first come first served, exactly 2 and 2 (1 and 1 with 4 or fewer), what each phase reveals, who else holds your cards, fair dealing over 4,000 turns, the lifeline (cell only, never on the last turn), the safe turn (any turn but the last), win conditions, deaths, players who leave, host hand-over, game numbers, and that no view ever contains your own card or anyone's token;
 - the blackout: only the Jack, only during the talk, once per game, not on the last turn; in that cell it takes every other lifeline but not the Jack's; no other player's state mentions it until the game is over, and then only the turn; the host's two switches (the power, and whether the end reveals it), which nobody else's state shows;
 - `viewers.js` on its own: thousands of simulated turns for every player count from 3 to 20, the matching fallback on its own, and a check that every valid arrangement of random viewers is equally likely, against a brute-force list of all of them; for small games, the corner a greedy pass walks into, the first to lock in always getting their choice, and every pairing equally likely when nobody chooses;
 - a full five-player game over real sockets: the race for the same person, the glimpse, your 2 cards, the lifeline, a dropped phone that reconnects, an impostor with a wrong token, a blackout (with the side-channel check above), and the Jack's death;
-- the private chat: who can write to whom and when (not in the lobby, not from the cell, not to or from the dead, not to yourself), cleaning and cutting the text, the 5-in-5-seconds limit, each player getting only their own conversations, messages never appearing in anyone's state, a new game starting empty, and over real sockets, the receiver getting exactly one event while every other phone receives nothing;
+- the private chat: who can write to whom and when (not in the lobby, not from the cell, not to or from the dead, not to yourself), cleaning and cutting the text, the 5-in-5-seconds limit, each player getting only their own conversations, messages never appearing in anyone's state, a new game starting empty, and over real sockets, the receiver getting exactly one event while every other phone receives nothing; voice messages (off by default, only in the talk, 20 seconds and 10 a talk at most, real audio only, never in anyone's state, forgotten by the server when the talk ends);
 - mugshots: an upload over the socket, the new version in everyone's state, the image over HTTP with its caching headers, and fake images (wrong bytes, wrong type, too big) refused;
 - the network helper: Android refusing to list interfaces is not a crash, and virtual adapters go last;
 - bad input that must produce clean errors.

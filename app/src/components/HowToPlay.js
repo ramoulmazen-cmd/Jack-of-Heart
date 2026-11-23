@@ -219,6 +219,7 @@ const SLIDES = [
     lines: [
       'You learn whose cards you hold and who holds yours, but you can’t look at any card.',
       'Make deals, set traps, and vote if the interrogation is open. The host sets how long it lasts.',
+      'Done early? Tap Skip at the top. It ends as soon as every living player has tapped it.',
     ],
   },
   {
@@ -237,6 +238,7 @@ const SLIDES = [
     lines: [
       'Hold one of your cards to look at it. Tell its owner their suit: the truth, or a lie.',
       'Write down what your two holders tell you in Notes.',
+      'Skip works here too: when every living player has tapped it, everyone goes to their cell.',
     ],
   },
   {
@@ -276,9 +278,12 @@ const SLIDES = [
         <Bubble text="I trust you, it’s" suit="clubs" />
       </View>
     ),
-    lines: [
+    lines: (s) => [
       'Tap Chat to message any living player. Only the two of you ever see it.',
       '10 words at most: tap ready phrases and suit buttons. Closed in your cell; the dead stay silent.',
+      s.voiceChat
+        ? 'Voice messages are on: during the talk, tap Voice (where Send is), talk, then Send. 20 s at most.'
+        : 'The host can switch on voice messages for the talk, for games played apart.',
     ],
   },
   {

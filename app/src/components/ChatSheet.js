@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SUIT_IMAGES, TINT_OF } from '../suitImages';
 import { color, SUITS, suitInk } from '../theme';
 import { useChatContext } from '../useChat';
+import { VOICE_MAX_SECONDS, playVoice, startRecording, voiceAvailable, voiceUnavailableReason } from '../voice';
 import { Avatar } from './Avatar';
 import { Sheet } from './Sheet';
 
@@ -36,6 +37,15 @@ const PHRASES = [
 ];
 
 const countWords = (text) => (text.trim() ? text.trim().split(/\s+/).length : 0);
+
+/** 0:07: a voice message's length. */
+const clock = (seconds) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
+
+/** A clip shorter than this is a slip of the finger, not a message. */
+const MIN_VOICE_SECONDS = 0.6;
+
+/** What a message says in a one-line preview. */
+const previewOf = (m) => (m.voice ? `Voice message ${clock(m.voice.seconds)}` : plainSuits(m.text));
 
 /** For one-line previews, where an image can't go: the suit's name instead of its symbol. */
 const plainSuits = (text) => text.replace(/[♠♥♦♣♤♡♢♧]/g, (c) => SUIT_OF[c]);
@@ -114,6 +124,8 @@ export function ChatSheet({ state }) {
   const chat = useChatContext();
   if (!chat?.available) return null;
   const other = chat.view.withId ? state.players.find((p) => p.id === chat.view.withId) : null;
+  // Voice messages: only if the host switched them on, and only during the talk.
+  const voice = state.settings.voiceChat === true && state.phase === 'discussion';
   return (
     <Sheet
       visible={chat.view.visible}
@@ -122,7 +134,7 @@ export function ChatSheet({ state }) {
       title={other ? other.name : 'Private chat'}
       tall
       stickToBottom={Boolean(other)}
-      footer={other ? <Composer key={other.id} chat={chat} other={other} /> : null}
+      footer={other ? <Composer key={other.id} chat={chat} other={other} voice={voice} /> : null}
     >
       {other ? <Conversation chat={chat} other={other} /> : <People state={state} chat={chat} />}
     </Sheet>
@@ -154,7 +166,7 @@ function People({ state, chat }) {
                 {p.name}
               </Text>
               <Text style={[styles.preview, unread > 0 && styles.previewNew]} numberOfLines={1}>
-                {last ? `${last.from === chat.me ? 'You: ' : ''}${plainSuits(last.text)}` : gone(p) ? 'Out' : 'No messages yet'}
+                {last ? `${last.from === chat.me ? 'You: ' : ''}${previewOf(last)}` : gone(p) ? 'Out' : 'No messages yet'}
               </Text>
             </View>
             {unread ? (
@@ -171,6 +183,32 @@ function People({ state, chat }) {
 
 function Conversation({ chat, other }) {
   const thread = chat.with(other.id);
+  const [playing, setPlaying] = useState(null);
+  const [playError, setPlayError] = useState(null);
+  const current = useRef(null);
+  // Leaving the conversation stops whatever is playing.
+  useEffect(() => () => current.current?.stop(), []);
+
+  // One clip at a time: tap to play, tap again to stop.
+  const toggle = (m) => {
+    const wasPlaying = playing === m.id;
+    current.current?.stop();
+    current.current = null;
+    setPlaying(null);
+    setPlayError(null);
+    if (wasPlaying || !m.voice?.data) return;
+    let handle = null;
+    handle = playVoice(m.voice.data, (err) => {
+      if (handle && current.current === handle) {
+        current.current = null;
+        setPlaying(null);
+      }
+      if (err) setPlayError(err.message);
+    });
+    current.current = handle;
+    setPlaying(m.id);
+  };
+
   let turn = null;
   return (
     <View style={styles.thread}>
@@ -182,23 +220,108 @@ function Conversation({ chat, other }) {
         return (
           <View key={m.id}>
             {newTurn ? <Text style={styles.turn}>Turn {m.turn}</Text> : null}
-            <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
-              <MessageText text={m.text} mine={mine} />
-            </View>
+            {m.voice ? (
+              <VoiceBubble message={m} mine={mine} playing={playing === m.id} onPress={() => toggle(m)} />
+            ) : (
+              <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
+                <MessageText text={m.text} mine={mine} />
+              </View>
+            )}
           </View>
         );
       })}
+      {playError ? <Text style={styles.error}>{playError}</Text> : null}
     </View>
   );
 }
 
-function Composer({ chat, other }) {
+// A still waveform, the same for every clip: it says "voice", it doesn't move.
+const WAVE = [6, 11, 16, 9, 13, 18, 10, 14, 7, 12, 16, 8, 11, 6];
+
+/** A voice message: play/stop, a still waveform, its length. Grey once the server no longer keeps it. */
+function VoiceBubble({ message, mine, playing, onPress }) {
+  const { seconds, data } = message.voice;
+  const kept = Boolean(data);
+  const ink = mine ? color.ink : color.chalk;
+  return (
+    <Pressable
+      role="button"
+      aria-label={
+        kept
+          ? `${playing ? 'Stop' : 'Play'} voice message, ${seconds} seconds`
+          : `Voice message, ${seconds} seconds, no longer kept`
+      }
+      disabled={!kept}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.bubble,
+        styles.voice,
+        mine ? styles.mine : styles.theirs,
+        !kept && styles.voiceGone,
+        pressed && styles.pressed,
+      ]}
+    >
+      <View style={[styles.playButton, { borderColor: ink }]}>
+        {playing ? (
+          <View style={[styles.stopShape, { backgroundColor: ink }]} />
+        ) : (
+          <View style={[styles.playShape, { borderLeftColor: ink }]} />
+        )}
+      </View>
+      <View style={styles.wave}>
+        {WAVE.map((h, i) => (
+          <View key={i} style={[styles.waveBar, { height: h, backgroundColor: ink }, playing && styles.waveBarOn]} />
+        ))}
+      </View>
+      <Text style={[styles.voiceTime, { color: ink }]}>{kept ? clock(seconds) : `${clock(seconds)} gone`}</Text>
+    </Pressable>
+  );
+}
+
+function Composer({ chat, other, voice }) {
   const [draft, setDraft] = useState('');
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const recorder = useVoiceRecorder({ voice, onClip: (clip) => chat.sendClip(other.id, clip), setError, setBusy });
   const out = !other.alive || other.left;
   const closed = chat.closedReason ? CLOSED[chat.closedReason] : out ? `${other.name} is out, and the dead stay silent.` : null;
   if (closed) return <Text style={styles.closed}>{closed}</Text>;
+
+  if (recorder.recording) {
+    const left = Math.max(0, VOICE_MAX_SECONDS - recorder.elapsed);
+    return (
+      <>
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+        <View style={styles.recBar}>
+          <View style={[styles.recFill, { width: `${Math.min(100, (recorder.elapsed / VOICE_MAX_SECONDS) * 100)}%` }]} />
+        </View>
+        <View style={styles.composer}>
+          <View style={styles.recording} aria-label={`Recording, ${Math.ceil(left)} seconds left`}>
+            <View style={styles.recDot} />
+            <Text style={styles.recTime}>
+              {clock(recorder.elapsed)} / {clock(VOICE_MAX_SECONDS)}
+            </Text>
+          </View>
+          <Pressable
+            role="button"
+            aria-label="Cancel voice message"
+            onPress={recorder.cancel}
+            style={({ pressed }) => [styles.recCancel, pressed && styles.pressed]}
+          >
+            <Text style={styles.recCancelText}>Cancel</Text>
+          </Pressable>
+          <Pressable
+            role="button"
+            aria-label="Send voice message"
+            onPress={recorder.finish}
+            style={({ pressed }) => [styles.send, pressed && styles.pressed]}
+          >
+            <Text style={styles.sendText}>Send</Text>
+          </Pressable>
+        </View>
+      </>
+    );
+  }
 
   const words = countWords(draft);
   const tooLong = words > MAX_WORDS;
@@ -277,18 +400,127 @@ function Composer({ chat, other }) {
           onSubmitEditing={send}
           style={styles.input}
         />
-        <Pressable
-          role="button"
-          aria-label="Send"
-          onPress={send}
-          disabled={!draft.trim() || busy || tooLong}
-          style={({ pressed }) => [styles.send, (!draft.trim() || busy || tooLong) && styles.sendOff, pressed && styles.pressed]}
-        >
-          <Text style={styles.sendText}>Send</Text>
-        </Pressable>
+        {/* In the talk, with voice on: an empty box offers Voice where Send would be. */}
+        {voice && !draft.trim() ? (
+          <Pressable
+            role="button"
+            aria-label="Record a voice message"
+            onPress={recorder.start}
+            disabled={busy}
+            style={({ pressed }) => [styles.send, styles.voiceButton, busy && styles.sendOff, pressed && styles.pressed]}
+          >
+            <Text style={styles.sendText}>Voice</Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            role="button"
+            aria-label="Send"
+            onPress={send}
+            disabled={!draft.trim() || busy || tooLong}
+            style={({ pressed }) => [styles.send, (!draft.trim() || busy || tooLong) && styles.sendOff, pressed && styles.pressed]}
+          >
+            <Text style={styles.sendText}>Send</Text>
+          </Pressable>
+        )}
       </View>
+      {voice ? <Text style={styles.voiceHint}>Voice messages: in the talk only, up to {VOICE_MAX_SECONDS} s.</Text> : null}
     </>
   );
+}
+
+/**
+ * Recording one voice message: start() asks for the microphone and starts, finish() stops and
+ * sends, cancel() throws it away. It sends by itself at VOICE_MAX_SECONDS, and throws the clip away
+ * if voice closes (the talk ends) or the conversation closes while recording.
+ */
+function useVoiceRecorder({ voice, onClip, setError, setBusy }) {
+  const [recording, setRecording] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const active = useRef(null); // { stop, cancel, started }
+  const alive = useRef(true);
+  const voiceRef = useRef(voice);
+  voiceRef.current = voice;
+  const onClipRef = useRef(onClip);
+  onClipRef.current = onClip;
+
+  const drop = () => {
+    const rec = active.current;
+    active.current = null;
+    setRecording(false);
+    rec?.cancel();
+  };
+
+  const finish = async () => {
+    const rec = active.current;
+    if (!rec) return;
+    active.current = null;
+    setRecording(false);
+    setBusy(true);
+    try {
+      const clip = await rec.stop();
+      if (clip.seconds < MIN_VOICE_SECONDS) {
+        setError('Too short: tap Voice, talk, then Send.');
+        return;
+      }
+      await onClipRef.current(clip);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      if (alive.current) setBusy(false);
+    }
+  };
+
+  const start = async () => {
+    setError(null);
+    if (!voiceAvailable()) {
+      setError(voiceUnavailableReason());
+      return;
+    }
+    try {
+      const rec = await startRecording();
+      // The talk ended or the chat closed while the microphone was being asked for.
+      if (!alive.current || !voiceRef.current) {
+        rec.cancel();
+        return;
+      }
+      active.current = { ...rec, started: Date.now() };
+      setElapsed(0);
+      setRecording(true);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  // The clock, 5 times a second; at the limit it sends what it has.
+  useEffect(() => {
+    if (!recording) return undefined;
+    const timer = setInterval(() => {
+      const rec = active.current;
+      if (!rec) return;
+      const seconds = (Date.now() - rec.started) / 1000;
+      setElapsed(Math.min(seconds, VOICE_MAX_SECONDS));
+      if (seconds >= VOICE_MAX_SECONDS) finish();
+    }, 200);
+    return () => clearInterval(timer);
+    // finish reads only refs, so the interval doesn't need to restart.
+  }, [recording]);
+
+  // The talk is over: no more recording.
+  useEffect(() => {
+    if (!voice && active.current) drop();
+  }, [voice]);
+
+  // The conversation closed: let go of the microphone.
+  useEffect(
+    () => () => {
+      alive.current = false;
+      active.current?.cancel();
+      active.current = null;
+    },
+    [],
+  );
+
+  return { recording, elapsed, start, finish, cancel: drop };
 }
 
 /** The top bar's way in: "Chat", with a count of messages you haven't read. */
@@ -407,6 +639,47 @@ const styles = StyleSheet.create({
   send: { height: 48, paddingHorizontal: 18, borderRadius: 14, backgroundColor: color.paint, alignItems: 'center', justifyContent: 'center' },
   sendOff: { opacity: 0.4 },
   sendText: { color: color.ink, fontSize: 16, fontWeight: '900' },
+  voiceButton: { backgroundColor: color.chalk },
+  voiceHint: { color: color.faded, fontSize: 12, textAlign: 'center', marginTop: 6 },
+
+  // A voice message in the thread.
+  voice: { flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 190 },
+  voiceGone: { opacity: 0.5 },
+  playButton: { width: 30, height: 30, borderRadius: 15, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  playShape: {
+    width: 0,
+    height: 0,
+    marginLeft: 3,
+    borderLeftWidth: 10,
+    borderTopWidth: 6,
+    borderBottomWidth: 6,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+  },
+  stopShape: { width: 10, height: 10, borderRadius: 2 },
+  wave: { flexDirection: 'row', alignItems: 'center', gap: 2, flexShrink: 1 },
+  waveBar: { width: 3, borderRadius: 2, opacity: 0.55 },
+  waveBarOn: { opacity: 1 },
+  voiceTime: { fontSize: 13, fontWeight: '800', fontVariant: ['tabular-nums'] },
+
+  // Recording.
+  recBar: { height: 4, borderRadius: 2, backgroundColor: color.wallLine, overflow: 'hidden', marginBottom: 10 },
+  recFill: { height: 4, backgroundColor: color.alarm },
+  recording: {
+    flex: 1,
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: color.alarm,
+  },
+  recDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: color.alarm },
+  recTime: { color: color.chalk, fontSize: 17, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  recCancel: { height: 48, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1.5, borderColor: color.wallLine, alignItems: 'center', justifyContent: 'center' },
+  recCancelText: { color: color.chalk, fontSize: 15, fontWeight: '800' },
 
   pill: {
     flexDirection: 'row',

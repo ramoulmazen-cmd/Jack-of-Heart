@@ -17,7 +17,7 @@ export function useChatContext() {
  * shows as new.
  */
 export function useChat(game) {
-  const { state, connected, chatHistory, onChatMessage, sendMessage } = game;
+  const { state, connected, chatHistory, onChatMessage, sendMessage, sendVoice } = game;
   const me = state?.you?.id ?? null;
   const scope = me ? `${state.code}:${state.gameNumber}:${me}` : null;
   const inGame = Boolean(me) && state.phase !== 'lobby';
@@ -89,6 +89,15 @@ export function useChat(game) {
     [sendMessage],
   );
 
+  // The reply leaves the clip out (you have it already): put it back on your own message.
+  const sendClip = useCallback(
+    async (to, clip) => {
+      const message = await sendVoice(to, clip.data, clip.seconds);
+      setMessages((prev) => merge(prev, [{ ...message, voice: { ...message.voice, data: clip.data } }]));
+    },
+    [sendVoice],
+  );
+
   return useMemo(
     () => ({
       me,
@@ -103,13 +112,18 @@ export function useChat(game) {
       show: (withId) => setView((v) => ({ ...v, withId })),
       close: () => setView((v) => ({ ...v, visible: false })),
       send,
+      sendClip,
     }),
-    [me, messages, inGame, state?.you?.chatClosed, read, unreadFrom, view, send],
+    [me, messages, inGame, state?.you?.chatClosed, read, unreadFrom, view, send, sendClip],
   );
 }
 
 function merge(current, incoming) {
   const byId = new Map(current.map((m) => [m.id, m]));
-  for (const m of incoming) byId.set(m.id, m);
+  for (const m of incoming) {
+    // The server forgets a clip when the talk ends; a history fetched later mustn't erase this phone's copy.
+    const had = byId.get(m.id);
+    byId.set(m.id, m.voice && !m.voice.data && had?.voice?.data ? { ...m, voice: had.voice } : m);
+  }
   return [...byId.values()].sort((a, b) => a.id - b.id);
 }

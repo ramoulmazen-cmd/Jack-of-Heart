@@ -192,7 +192,11 @@ export function createGameServer({ timeScale = 1, webDir, lanAddresses = () => [
         return;
       }
       // If they were the last one the others were waiting for, nobody waits for the clock.
-      if ((game.phase === 'choose' && game.everyoneChose) || (game.phase === 'confinement' && game.everyoneAnswered)) {
+      if (
+        (game.phase === 'choose' && game.everyoneChose) ||
+        (game.phase === 'confinement' && game.everyoneAnswered) ||
+        game.everyoneSkipped
+      ) {
         game.advance();
         schedule(room);
       }
@@ -298,17 +302,34 @@ export function createGameServer({ timeScale = 1, webDir, lanAddresses = () => [
       return { message };
     });
 
+    // A voice message, in the talk only, if the host switched them on. Like a text, it goes to its
+    // receiver and nobody else; the sender already has the clip, so the reply leaves it out.
+    handle('chat:voice', ({ to, audio, seconds }) => {
+      const { room, game, playerId } = current();
+      const message = game.sendVoice(playerId, to, audio, seconds);
+      const receiver = room.sockets.get(to);
+      if (receiver) {
+        io.to(receiver).emit('chat:message', { ...message, voice: { ...message.voice, data: game.voiceDataOf(message.id) } });
+      }
+      return { message };
+    });
+
     // Your own messages, sent and received, for a phone that reconnects or reloads.
     handle('chat:history', () => {
       const { game, playerId } = current();
       return { gameNumber: game.gameNumber, messages: game.chatFor(playerId) };
     });
 
-    handle('game:skip', () => {
+    // Skip, in Plotting or the talk: { skip: false } takes yours back. It ends early only once
+    // every living player has pressed it; until then everyone just sees the count go up.
+    handle('game:skip', ({ skip = true }) => {
       const { room, game, playerId } = current();
-      game.skipDiscussion(playerId);
+      game.skip(playerId, skip !== false);
+      if (game.everyoneSkipped) {
+        game.advance();
+        schedule(room);
+      }
       broadcast(room);
-      schedule(room);
     });
 
     handle('turn:answer', ({ suit }) => {
