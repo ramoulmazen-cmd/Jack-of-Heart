@@ -85,18 +85,62 @@
         }, true);
       })();
 
-      // A browser can't block the phone's screenshot buttons (the app can, and does). What a page can
-      // do: cover the game the moment you leave it (switching apps, the notification shade, another
-      // window), so app-switcher previews and many screenshot tools catch a blank screen, and cover
-      // it for a moment when Print Screen is pressed on a computer.
+      // A browser can't block the phone's screenshot buttons (the app can, and does): the phone takes
+      // the picture and the page is never told. What a page can do: cover the game the moment you
+      // leave it (switching apps, the notification shade, another window), so app-switcher previews
+      // and many screenshot tools catch a blank screen; on a computer, cover it while the Windows or
+      // Cmd key is down, which every screenshot shortcut starts with (Win+Shift+S, Win+PrtScn,
+      // Cmd+Shift+3/4/5), and for a moment after Print Screen; on a phone, cover it while 3 fingers
+      // touch the screen (the 3-finger screenshot swipe of many Android phones).
       (function () {
         var shield;
+        var heldBy = null; // 'key' or 'fingers' while one of those holds the cover
         var cover = function () {
           if (shield) shield.style.display = 'flex';
         };
         var uncover = function () {
-          if (shield && !document.hidden) shield.style.display = 'none';
+          if (shield && !document.hidden && !heldBy) shield.style.display = 'none';
         };
+        var hold = function (by) {
+          heldBy = by;
+          cover();
+        };
+        var release = function (by) {
+          if (heldBy !== by) return;
+          heldBy = null;
+          setTimeout(uncover, 250);
+        };
+        // The Windows / Cmd key: covered while it's down.
+        document.addEventListener(
+          'keydown',
+          function (e) {
+            if (e.key === 'Meta' || e.key === 'OS' || e.metaKey) hold('key');
+          },
+          true,
+        );
+        document.addEventListener(
+          'keyup',
+          function (e) {
+            if (!e.metaKey) release('key');
+          },
+          true,
+        );
+        // A screenshot tool can swallow the key-up: the next move of the mouse without it uncovers.
+        document.addEventListener(
+          'pointermove',
+          function (e) {
+            if (!e.metaKey) release('key');
+          },
+          true,
+        );
+        // 3 fingers or more: covered until fewer than 3 touch. (2 is fine: you can hold both your cards.)
+        var fingers = function (e) {
+          if (e.touches.length >= 3) hold('fingers');
+          else release('fingers');
+        };
+        document.addEventListener('touchstart', fingers, { capture: true, passive: true });
+        document.addEventListener('touchend', fingers, { capture: true, passive: true });
+        document.addEventListener('touchcancel', fingers, { capture: true, passive: true });
         document.addEventListener('DOMContentLoaded', function () {
           shield = document.createElement('div');
           shield.setAttribute('aria-hidden', 'true');
