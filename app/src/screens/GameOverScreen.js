@@ -2,8 +2,9 @@ import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Avatar } from '../components/Avatar';
 import { Burst, Flash, Glow, Stamp } from '../components/Effects';
 import { LeaveButtons } from '../components/LeaveButtons';
+import { LiveJackCard } from '../components/LiveJackCard';
 import { color, font, suitInk } from '../theme';
-import { Button, ErrorText, JackCard, Screen, SuitIcon, useAction } from '../ui';
+import { Button, ErrorText, Screen, SuitIcon, useAction } from '../ui';
 
 export default function GameOverScreen({ state, game }) {
   const { you, players, result } = state;
@@ -41,7 +42,7 @@ export default function GameOverScreen({ state, game }) {
       <View style={styles.stage}>
         <Glow size={360} tint={cleared ? color.paint : color.red} strength={1.4} />
         {cleared ? <Burst count={26} radius={210} /> : null}
-        <JackCard size={cardSize} entrance tilt="-5deg" />
+        <LiveJackCard size={cardSize} entrance tilt="-5deg" />
         <Stamp
           text={cleared ? 'Game clear' : jackWon ? 'Jack wins' : 'No survivors'}
           tint={cleared ? color.paint : color.alarm}

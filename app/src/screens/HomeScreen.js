@@ -3,10 +3,11 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Avatar } from '../components/Avatar';
 import { Backdrop } from '../components/Backdrop';
 import { Glow } from '../components/Effects';
+import { LiveJackCard } from '../components/LiveJackCard';
 import { PhotoSheet } from '../components/PhotoSheet';
 import { Sheet } from '../components/Sheet';
 import { color, font } from '../theme';
-import { Button, ErrorText, Field, JackCard, PencilMark, Screen, useAction } from '../ui';
+import { Button, ErrorText, Field, PencilMark, Screen, useAction } from '../ui';
 
 const servedByGame = Platform.OS === 'web' && typeof window !== 'undefined' && window.location.port !== '8081';
 
@@ -27,7 +28,7 @@ export default function HomeScreen({ game }) {
       <View style={styles.hero}>
         <View style={styles.jack}>
           <Glow size={300} tint={color.red} strength={1.2} />
-          <JackCard size={132} entrance tilt="-6deg" />
+          <LiveJackCard size={132} entrance tilt="-6deg" />
         </View>
         <Text style={styles.title}>Jack of Hearts</Text>
       </View>

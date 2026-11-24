@@ -1,16 +1,20 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { Animated, Easing, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, Easing, Platform, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { native, useReducedMotion } from '../motion';
 import { SUIT_IMAGES, TINT_OF } from '../suitImages';
 import { color, font } from '../theme';
 import { useSecondsLeft } from '../ui';
+
+// In the browser an endless loop is a CSS animation, so the page runs no JavaScript for it on
+// every frame. Phones keep Animated, which already runs on the UI thread there.
+const cssLoops = Platform.OS === 'web';
 
 /** A soft round glow made of stacked translucent discs, so it looks the same on every platform. */
 export function Glow({ size = 260, tint = color.paint, pulse = true, strength = 1 }) {
   const reduced = useReducedMotion();
   const breath = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    if (!pulse || reduced) return undefined;
+    if (!pulse || reduced || cssLoops) return undefined;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(breath, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: native }),
@@ -27,7 +31,11 @@ export function Glow({ size = 260, tint = color.paint, pulse = true, strength = 
       style={[
         styles.glow,
         { width: size, height: size, marginLeft: -size / 2, marginTop: -size / 2 },
-        { transform: [{ scale: breath.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1.08] }) }] },
+        cssLoops
+          ? pulse && !reduced
+            ? webLoops.breathe
+            : null
+          : { transform: [{ scale: breath.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1.08] }) }] },
       ]}
     >
       {rings.map((r) => (
@@ -251,6 +259,21 @@ export function PhaseIntro({ word, tint = color.chalk }) {
     </Animated.View>
   );
 }
+
+// The glow's breath, as a CSS animation (react-native-web turns animationKeyframes into @keyframes):
+// 1.4 s out and 1.4 s back, like the Animated version.
+const webLoops = cssLoops
+  ? StyleSheet.create({
+      breathe: {
+        animationKeyframes: [
+          { '0%': { transform: [{ scale: 0.94 }] }, '50%': { transform: [{ scale: 1.08 }] }, '100%': { transform: [{ scale: 0.94 }] } },
+        ],
+        animationDuration: '2800ms',
+        animationIterationCount: 'infinite',
+        animationTimingFunction: 'ease-in-out',
+      },
+    })
+  : null;
 
 const styles = StyleSheet.create({
   glow: { position: 'absolute', left: '50%', top: '50%', alignItems: 'center', justifyContent: 'center' },
