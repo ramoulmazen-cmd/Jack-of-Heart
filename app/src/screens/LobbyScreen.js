@@ -72,10 +72,18 @@ export default function LobbyScreen({ state, game }) {
           onPress={() => (isHost ? setSheet('settings') : null)}
           style={({ pressed }) => [styles.tool, styles.settings, pressed && isHost && styles.pressed]}
         >
-          {settingsSummary(state.settings).map(({ label, value }) => (
-            <Text key={label} style={styles.setting}>
-              <Text style={styles.settingValue}>{value}</Text> {label.toLowerCase()}
-            </Text>
+          {/* The same groups as the host's Settings: Time, Game, The Jack, Chat. */}
+          {settingsSummary(state.settings).map((group) => (
+            <View key={group.title} style={styles.group}>
+              <Text style={styles.groupTitle}>{group.title}</Text>
+              <View style={styles.groupRows}>
+                {group.rows.map(({ label, value }) => (
+                  <Text key={label} style={styles.setting}>
+                    <Text style={styles.settingValue}>{value}</Text> {label}
+                  </Text>
+                ))}
+              </View>
+            </View>
           ))}
           {isHost ? <Text style={styles.edit}>Edit</Text> : null}
         </Pressable>
@@ -123,10 +131,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   toolText: { color: color.chalk, fontSize: 16, fontWeight: '700' },
-  settings: { flexDirection: 'row', gap: 14, flexWrap: 'wrap', alignContent: 'center', paddingVertical: 10 },
-  setting: { color: color.faded, fontSize: 14 },
+  settings: { alignItems: 'stretch', paddingVertical: 12, gap: 8 },
+  group: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  groupTitle: {
+    width: 72,
+    color: color.paint,
+    fontSize: 11,
+    lineHeight: 19,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  groupRows: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', columnGap: 12, rowGap: 2 },
+  setting: { color: color.faded, fontSize: 14, lineHeight: 19 },
   settingValue: { color: color.chalk, fontWeight: '800' },
-  edit: { color: color.paint, fontSize: 14, fontWeight: '800' },
+  edit: { alignSelf: 'flex-end', color: color.paint, fontSize: 14, fontWeight: '800' },
   waiting: { minHeight: 56, alignItems: 'center', justifyContent: 'center' },
   waitingText: { color: color.faded, fontSize: 16 },
 });

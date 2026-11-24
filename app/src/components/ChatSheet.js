@@ -126,7 +126,7 @@ export function ChatSheet({ state }) {
   if (!chat?.available) return null;
   const other = chat.view.withId ? state.players.find((p) => p.id === chat.view.withId) : null;
   // Voice messages: only if the host switched them on, and only during the talk (with the talk's chat on).
-  const voice = state.settings.voiceChat === true && state.settings.talkChat !== false && state.phase === 'discussion';
+  const voice = state.settings.voiceChat === true && state.settings.talkChat === true && state.phase === 'discussion';
   return (
     <Sheet
       visible={chat.view.visible}

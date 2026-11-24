@@ -58,11 +58,12 @@ export const SETTING_LIMITS = {
 /**
  * On/off rules everyone can see. `interrogation`: once a game, the table can vote one player alone.
  * `safeTurn`: one secret turn (never the last) where nobody dies. `talkChat`: the private chat
- * stays open during the talk; off, it's open only while choosing and in Plotting, so in the talk
- * everyone has to talk to each other. `voiceChat`: voice messages in the private chat, during the
- * talk only (so only with `talkChat`); off by default, since in one room everyone would hear them.
+ * stays open during the talk; off (the default), it's open only while choosing and in Plotting, so
+ * in the talk everyone has to talk to each other. `voiceChat`: voice messages in the private chat,
+ * during the talk only, so they come with `talkChat` (see updateSettings); off by default, since in
+ * one room everyone would hear them.
  */
-export const PUBLIC_SWITCHES = { interrogation: true, safeTurn: true, talkChat: true, voiceChat: false };
+export const PUBLIC_SWITCHES = { interrogation: true, safeTurn: true, talkChat: false, voiceChat: false };
 
 const RED_SUITS = new Set(['hearts', 'diamonds']);
 
@@ -233,6 +234,9 @@ export class Game {
       if (typeof changes[key] !== 'boolean') throw new GameError('BAD_SETTINGS', `${key} must be on or off.`);
       this.settings[key] = changes[key];
     }
+    // Voice messages live in the talk's private chat: voice on opens it, closing it ends voice.
+    if (changes?.voiceChat === true) this.settings.talkChat = true;
+    else if (changes?.talkChat === false) this.settings.voiceChat = false;
   }
 
   start(byId) {
@@ -461,14 +465,14 @@ export class Game {
   /**
    * Why `player` can't send a private message right now, or null if they can. The chat opens when
    * the game starts, closes in the cell (no talking in the cell) and stays shut for the dead. It's
-   * always open in Plotting; in the talk only if the host left `talkChat` on.
+   * always open in Plotting; in the talk only if the host switched `talkChat` on.
    */
   chatClosedFor(player) {
     if (!player || player.left) return 'gone';
     if (this.phase === 'lobby') return 'lobby';
     if (!player.alive) return 'dead';
     if (this.phase === 'confinement') return 'cell';
-    if (this.phase === 'discussion' && this.settings.talkChat === false) return 'talk';
+    if (this.phase === 'discussion' && this.settings.talkChat !== true) return 'talk';
     return null;
   }
 
