@@ -111,6 +111,7 @@ function MessageText({ text, mine }) {
 
 const CLOSED = {
   cell: 'No talking in the cell. You can read, not write.',
+  talk: 'No private chat in the talk in this room: talk to each other. It opens again while choosing and in Plotting.',
   dead: 'You’re out, and the dead stay silent.',
   lobby: 'The chat opens when the game starts.',
   gone: 'You left the game.',
@@ -124,8 +125,8 @@ export function ChatSheet({ state }) {
   const chat = useChatContext();
   if (!chat?.available) return null;
   const other = chat.view.withId ? state.players.find((p) => p.id === chat.view.withId) : null;
-  // Voice messages: only if the host switched them on, and only during the talk.
-  const voice = state.settings.voiceChat === true && state.phase === 'discussion';
+  // Voice messages: only if the host switched them on, and only during the talk (with the talk's chat on).
+  const voice = state.settings.voiceChat === true && state.settings.talkChat !== false && state.phase === 'discussion';
   return (
     <Sheet
       visible={chat.view.visible}

@@ -57,10 +57,12 @@ export const SETTING_LIMITS = {
 
 /**
  * On/off rules everyone can see. `interrogation`: once a game, the table can vote one player alone.
- * `safeTurn`: one secret turn (never the last) where nobody dies. `voiceChat`: voice messages in
- * the private chat, during the talk only; off by default, since in one room everyone would hear them.
+ * `safeTurn`: one secret turn (never the last) where nobody dies. `talkChat`: the private chat
+ * stays open during the talk; off, it's open only while choosing and in Plotting, so in the talk
+ * everyone has to talk to each other. `voiceChat`: voice messages in the private chat, during the
+ * talk only (so only with `talkChat`); off by default, since in one room everyone would hear them.
  */
-export const PUBLIC_SWITCHES = { interrogation: true, safeTurn: true, voiceChat: false };
+export const PUBLIC_SWITCHES = { interrogation: true, safeTurn: true, talkChat: true, voiceChat: false };
 
 const RED_SUITS = new Set(['hearts', 'diamonds']);
 
@@ -458,13 +460,15 @@ export class Game {
 
   /**
    * Why `player` can't send a private message right now, or null if they can. The chat opens when
-   * the game starts, closes in the cell (no talking in the cell) and stays shut for the dead.
+   * the game starts, closes in the cell (no talking in the cell) and stays shut for the dead. It's
+   * always open in Plotting; in the talk only if the host left `talkChat` on.
    */
   chatClosedFor(player) {
     if (!player || player.left) return 'gone';
     if (this.phase === 'lobby') return 'lobby';
     if (!player.alive) return 'dead';
     if (this.phase === 'confinement') return 'cell';
+    if (this.phase === 'discussion' && this.settings.talkChat === false) return 'talk';
     return null;
   }
 
@@ -531,6 +535,9 @@ export class Game {
     if (closed === 'lobby') throw new GameError('CHAT_CLOSED', 'The chat opens when the game starts.');
     if (closed === 'dead') throw new GameError('NOT_ALIVE', 'The dead stay silent.');
     if (closed === 'cell') throw new GameError('CHAT_CLOSED', 'No talking in the cell.');
+    if (closed === 'talk') {
+      throw new GameError('CHAT_CLOSED', 'No private chat in the talk in this room: talk to each other.');
+    }
     if (toId === fromId) throw new GameError('BAD_TARGET', 'Message someone else.');
     const to = typeof toId === 'string' ? this.players.get(toId) : undefined;
     if (!to || to.left) throw new GameError('BAD_TARGET', 'That player is not in the game.');
@@ -657,7 +664,7 @@ export class Game {
             // For each card you see, the one other person who sees it too.
             sharedWith: Object.fromEntries(mine.map((id) => [id, otherViewer(this.viewers, id, viewerId)])),
             safeResult: safe ? this.safeResults.get(me.id) ?? null : null,
-            // Why you can't send a private message right now ('lobby', 'cell', 'dead'), or null.
+            // Why you can't send a private message right now ('lobby', 'cell', 'talk', 'dead'), or null.
             chatClosed: this.chatClosedFor(me),
             interrogated: isolated,
             ...blackout,

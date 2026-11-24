@@ -279,11 +279,17 @@ const SLIDES = [
       </View>
     ),
     lines: (s) => [
-      'Tap Chat to message any living player. Only the two of you ever see it.',
-      '10 words at most: tap ready phrases and suit buttons. Closed in your cell; the dead stay silent.',
-      s.voiceChat
-        ? 'Voice messages are on: during the talk, tap Voice (where Send is), talk, then Send. 20 s at most.'
-        : 'The host can switch on voice messages for the talk, for games played apart.',
+      'Tap Chat to message any living player. Only the two of you ever see it. 10 words at most: tap ready phrases and suit buttons.',
+      s.talkChat === false
+        ? 'Open while choosing and in Plotting. In this room it’s closed in the talk: talk to each other. Closed in your cell too.'
+        : 'Open while choosing, in Plotting and in the talk. Closed in your cell; the dead stay silent.',
+      ...(s.talkChat === false
+        ? []
+        : [
+            s.voiceChat
+              ? 'Voice messages are on: during the talk, tap Voice (where Send is), talk, then Send. 20 s at most.'
+              : 'The host can switch on voice messages for the talk, for games played apart.',
+          ]),
     ],
   },
   {

@@ -1209,6 +1209,28 @@ test('voice messages: only if the host turns them on, only in the talk, 20 s at 
   assert.throws(() => on.game.sendVoice(x.id, y.id, fakeClip(), 3), { code: 'CHAT_CLOSED' }, 'no talking in the cell');
 });
 
+test('the private chat in the talk is a host switch; Plotting always has it, never voice', () => {
+  const { game, host, players } = setup(5);
+  assert.equal(game.settings.talkChat, true, 'on by default');
+  game.updateSettings(host.id, { talkChat: false, voiceChat: true });
+  assert.equal(game.viewFor(players[2].id).settings.talkChat, false, 'everyone sees the switch');
+  start(game, host);
+  const [a, b] = players;
+  assert.equal(game.sendMessage(a.id, b.id, 'choose me').text, 'choose me', 'open while choosing');
+  toBriefing(game);
+  assert.equal(game.viewFor(a.id).you.chatClosed, null, 'always open in Plotting');
+  game.sendMessage(b.id, a.id, 'deal');
+  assert.throws(() => game.sendVoice(a.id, b.id, fakeClip(), 3), { code: 'VOICE_CLOSED' }, 'never voice in Plotting');
+
+  game.advance(); // the talk
+  assert.equal(game.viewFor(a.id).you.chatClosed, 'talk');
+  assert.throws(() => game.sendMessage(a.id, b.id, 'hello'), { code: 'CHAT_CLOSED' });
+  assert.throws(() => game.sendVoice(a.id, b.id, fakeClip(), 3), { code: 'CHAT_CLOSED' }, 'and no voice either');
+  assert.equal(game.chatFor(a.id).length, 2, 'what was said before is still there to read');
+  game.advance(); // the cell
+  assert.equal(game.viewFor(a.id).you.chatClosed, 'cell');
+});
+
 test('a private message is at most 10 words; a suit symbol counts as one', () => {
   const { game, host } = setup(5);
   start(game, host);
