@@ -39,3 +39,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Written by assets/art/jack-of-hearts/gen.mjs; the app uses assets/jack-card.png
+assets/art/jack-of-hearts/card.svg
